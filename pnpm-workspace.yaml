@@ -3,6 +3,9 @@ packages:
 
 nodeLinker: hoisted
 autoInstallPeers: false
+overrides:
+  react: 18.2.0
+  react-dom: 18.2.0
 allowBuilds:
   '@google/genai': false
   protobufjs: false

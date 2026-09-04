@@ -53,6 +53,52 @@ test('applies a multi-file transaction and returns an actual unified diff', asyn
   assert.match(result.diff, /--- a\/app\.txt/u)
   assert.match(result.diff, /\+TWO/u)
   assert.deepEqual(result.files.map(file => file.action), ['update', 'add', 'delete', 'move'])
+  assert.deepEqual(result.diffs.map(diff => diff.path), [
+    'app.txt',
+    'delete.txt',
+    'move.txt',
+    'moved.txt',
+    'nested/new.txt',
+  ])
+  assert.deepEqual(result.diffs[0], {
+    path: 'app.txt',
+    oldText: 'one\ntwo\nthree',
+    newText: 'one\nTWO\nthree',
+  })
+  assert.deepEqual(Object.fromEntries(result.diffs.slice(1).map(diff => [diff.path, {
+    oldText: diff.oldText,
+    newText: diff.newText,
+  }])), {
+    'delete.txt': { oldText: 'remove me', newText: '' },
+    'move.txt': { oldText: 'old', newText: '' },
+    'moved.txt': { oldText: null, newText: 'new' },
+    'nested/new.txt': { oldText: null, newText: 'created' },
+  })
+})
+
+test('keeps distant updates as separate replayable presentation hunks', async t => {
+  const root = await workspace(t)
+  const lines = Array.from({ length: 12 }, (_, index) => `line ${index + 1}`)
+  await writeFile(join(root, 'spread.txt'), `${lines.join('\n')}\n`)
+
+  const result = await applyPatchAtomic({
+    cwd: root,
+    patch: `*** Begin Patch
+*** Update File: spread.txt
+@@
+-line 1
++first
+@@
+-line 12
++last
+*** End Patch`,
+  })
+
+  assert.equal(result.diffs.length, 2)
+  assert.deepEqual(result.diffs.map(diff => diff.path), ['spread.txt', 'spread.txt'])
+  assert.match(result.diffs[0].newText, /^first\nline 2/u)
+  assert.doesNotMatch(result.diffs[0].newText, /last/u)
+  assert.match(result.diffs[1].newText, /line 11\nlast$/u)
 })
 
 test('preflight failure leaves every target untouched', async t => {

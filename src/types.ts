@@ -42,10 +42,17 @@ export interface AppliedFile {
   from?: string
 }
 
+export interface PresentationDiff {
+  path: string
+  oldText: string | null
+  newText: string
+}
+
 export interface ApplyPatchResult {
   summary: string
   diff: string
   files: AppliedFile[]
+  diffs: PresentationDiff[]
 }
 
 export interface ApplyPatchOptions {

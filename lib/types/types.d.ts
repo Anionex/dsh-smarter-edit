@@ -35,10 +35,16 @@ export interface AppliedFile {
     path: string;
     from?: string;
 }
+export interface PresentationDiff {
+    path: string;
+    oldText: string | null;
+    newText: string;
+}
 export interface ApplyPatchResult {
     summary: string;
     diff: string;
     files: AppliedFile[];
+    diffs: PresentationDiff[];
 }
 export interface ApplyPatchOptions {
     cwd: string;

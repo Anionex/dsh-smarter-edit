@@ -26,7 +26,7 @@ One call can add, update, move, and delete multiple files with multiple ordered 
 | --- | --- | --- |
 | Multi-file and multi-hunk changes | One ordered call | One exact replacement per call |
 | Matching | Ordered context with whitespace and Unicode-punctuation fallback | Exact `old_string` match |
-| Review output | Unified diff plus operation summary | Tool-specific replacement result |
+| Review output | Unified diff, operation summary, and native DSH diff card | Native DSH diff card |
 | Handled multi-file failure | Full preflight and rollback | Each completed call is already committed |
 | Model token overhead | Usually lower for related edits; patch syntax adds markers | Usually lower for one tiny exact replacement |
 | Model transport | Raw OpenAI custom-tool input through pi-ai | Ordinary JSON function arguments |
@@ -46,6 +46,7 @@ The one intentional execution difference is failure handling: upstream scenario 
 - Resolves relative paths from the Session working directory, accepts absolute paths, and follows symbolic links; DSH's active sandbox remains the permission boundary.
 - Stages every new file body before commit, publishes without clobbering a concurrently created path, validates atomically captured backups, verifies final contents, and rolls back already-published targets in reverse order after an ordinary detected failure.
 - Returns a canonical unified diff and an operation summary.
+- Registers its conversation row through DSH's official keyed toolview slot and renders applied metadata with the native `DiffBlock`.
 - Removes native `edit` and legacy `str_replace_editor` from the assembled model tool list, and removes the native edit prompt section, while this plugin is active; unloading the plugin restores the original surface.
 
 The transaction is **failure-atomic**, not a crash-safe filesystem transaction. A handled parse, preflight, stage, commit, or verification failure leaves no partial target changes when rollback succeeds. Process termination, kernel failure, power loss, or a rollback I/O failure can still leave recovery files; no general host filesystem provides a crash-atomic multi-file transaction.
@@ -67,7 +68,7 @@ pnpm install --frozen-lockfile
 pnpm run check
 pnpm pack
 
-dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.1.tgz
+dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.2.tgz
 dsh --profile web --dump-config | grep tool-apply-patch
 ```
 

@@ -76,7 +76,14 @@ test('registers one raw patch string tool and filters native edit reversibly', a
     assert.deepEqual(assembled.tools.map(tool => tool.name), ['apply_patch'])
     assert.deepEqual(assembled.sections.map(section => section.name), ['tool:write', 'tool:apply-patch'])
     assert.match(assembled.sections[0].text, /prefer apply_patch/u)
-    assert.match(definition.output.render({}, { summary: 'Done!', diff: '--- a\n+++ b', files: [] })[0].text, /--- a/u)
+    const value = {
+      summary: 'Done!',
+      diff: '--- a\n+++ b',
+      files: [],
+      diffs: [{ path: 'a.txt', oldText: 'old', newText: 'new' }],
+    }
+    assert.match(definition.output.render({}, value)[0].text, /--- a/u)
+    assert.deepEqual(definition.output.presentationMeta({}, value), { diffs: value.diffs })
   } finally {
     for (const dispose of disposers.reverse()) dispose()
   }
@@ -87,11 +94,13 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-apply-patch')
-  assert.equal(pkg.version, '0.1.1')
+  assert.equal(pkg.version, '0.1.2')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')
   assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml')
+  assert.equal(pkg.dsh.client.platform, 'web')
+  assert.ok(pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-tool'))
   assert.ok(pkg.dsh.compatibility.profiles.includes('desktop'))
   assert.equal(pkg.main, 'lib/index.js')
   assert.equal(pkg.types, 'lib/types/index.d.ts')
@@ -105,6 +114,8 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   assert.match(workspace, /^autoInstallPeers: false$/mu)
   await access(new URL(pkg.main, root))
   await access(new URL(pkg.types, root))
+  await access(new URL(pkg.exports['./client'].default, root))
+  await access(new URL(pkg.exports['./client'].types, root))
   await access(new URL(pkg.dsh.bundle.patch, root))
   await access(new URL('third_party/codex/apply_patch.lark', root))
   await access(new URL('third_party/codex/LICENSE', root))

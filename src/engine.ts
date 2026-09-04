@@ -2,7 +2,7 @@ import { constants } from 'node:fs'
 import { link, mkdir, open, readFile, realpath, rename, rm, rmdir, stat, unlink } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { createTwoFilesPatch } from 'diff'
+import { createTwoFilesPatch, structuredPatch } from 'diff'
 import { PatchError, patchErrorMessage } from './errors.js'
 import { applyChunks } from './matcher.js'
 import { parsePatch } from './parser.js'
@@ -12,6 +12,7 @@ import type {
   ApplyPatchResult,
   ParsedPatch,
   PatchOperation,
+  PresentationDiff,
 } from './types.js'
 
 interface FileSnapshot {
@@ -403,6 +404,40 @@ function canonicalDiff(plan: PatchPlan): string {
   }).filter(Boolean).join('\n')
 }
 
+/** Derive the same three-line-context hunks consumed by DSH's native DiffBlock. */
+function presentationDiffs(plan: PatchPlan): PresentationDiff[] {
+  return plan.targets.flatMap((target) => {
+    const patch = structuredPatch(
+      '',
+      '',
+      target.snapshot.content ?? '',
+      target.newContent ?? '',
+      undefined,
+      undefined,
+      { context: 3 },
+    )
+    return patch.hunks.map((hunk) => {
+      const oldLines: string[] = []
+      const newLines: string[] = []
+      for (const line of hunk.lines) {
+        if (line.startsWith('\\')) continue
+        const text = line.slice(1)
+        if (line.startsWith('-')) oldLines.push(text)
+        else if (line.startsWith('+')) newLines.push(text)
+        else {
+          oldLines.push(text)
+          newLines.push(text)
+        }
+      }
+      return {
+        path: target.relativePath,
+        oldText: oldLines.length === 0 ? null : oldLines.join('\n'),
+        newText: newLines.join('\n'),
+      }
+    })
+  })
+}
+
 function codexSummary(files: readonly AppliedFile[]): string {
   const lines = ['Success. Updated the following files:']
   for (const file of files.filter(candidate => candidate.action === 'add')) lines.push(`A ${file.path}`)
@@ -416,11 +451,13 @@ export async function applyPatchAtomic(options: ApplyPatchOptions): Promise<Appl
   const plan = await buildPlan(options)
   await options.hooks?.beforeDiff?.()
   const diff = canonicalDiff(plan)
+  const diffs = presentationDiffs(plan)
   await commit(plan, options)
   return {
     summary: codexSummary(plan.files),
     diff,
     files: plan.files,
+    diffs,
   }
 }
 

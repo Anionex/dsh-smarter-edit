@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | 多文件、多 hunk 修改 | 一次调用内有序完成 | 每次调用完成一处精确替换 |
 | 匹配方式 | 有序上下文匹配，并支持空白及 Unicode 标点回退 | 精确匹配 `old_string` |
-| 审查输出 | Unified diff 与操作摘要 | 工具自己的替换结果 |
+| 审查输出 | Unified diff、操作摘要及 DSH 原生 diff 卡片 | DSH 原生 diff 卡片 |
 | 多文件普通失败 | 完整预演，失败后回滚 | 已完成的各次调用不会一起回滚 |
 | 模型 token 开销 | 相关修改通常更低，但 patch 语法有标记开销 | 单个很小的精确替换通常更低 |
 | 模型传输 | 通过 pi-ai 发送原始 OpenAI custom-tool 输入 | 普通 JSON function 参数 |
@@ -46,6 +46,7 @@ Lark grammar 与 OpenAI Codex 提交 `8e6a44b428e31f91b21edc97904fcdf4f0931ade` 
 - 相对路径从 Session 工作目录解析，同时接受绝对路径并跟随符号链接；权限边界完全沿用 DSH 当前 sandbox。
 - 提交前先在同目录暂存全部新内容；发布不会覆盖最后检查后并发创建的路径；原文件被原子捕获为备份并复验；普通可检测失败会逆序恢复已经发布的目标。
 - 返回标准 unified diff 和操作摘要。
+- 通过 DSH 官方 keyed toolview slot 注册对话行，并用原生 `DiffBlock` 展示已应用的结构化 diff 元数据。
 - 插件生效时，从模型工具列表中移除原生 `edit` 和旧版 `str_replace_editor`，并移除原生 edit 提示；卸载插件后恢复原有表面。
 
 这里保证的是**失败原子性**，不是跨文件的崩溃安全事务。解析、预演、暂存、提交或复验发生普通可处理错误时，只要回滚成功，目标文件不会留下部分修改。进程被强制终止、内核或电源故障、回滚自身发生 I/O 错误时仍可能留下恢复文件；普通宿主文件系统没有通用的崩溃原子多文件事务。
@@ -67,7 +68,7 @@ pnpm install --frozen-lockfile
 pnpm run check
 pnpm pack
 
-dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.1.tgz
+dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.2.tgz
 dsh --profile web --dump-config | grep tool-apply-patch
 ```
 
