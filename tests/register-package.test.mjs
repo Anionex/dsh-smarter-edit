@@ -31,7 +31,7 @@ test('registers one raw patch string tool and filters native edit reversibly', a
     assert.equal(definition.name, 'apply_patch')
     assert.deepEqual(definition.parameters.required, ['patch'])
     assert.equal(definition.parameters.properties.patch.type, 'string')
-    assert.match(definition.description, /FREEFORM/u)
+    assert.equal(definition.description, 'Create, update, move, and delete files by applying a patch.')
     assert.equal(sections[0].name, 'tool:apply-patch')
     const raw = '*** Begin Patch\n*** Add File: a.txt\n+x\n*** End Patch\n'
     assert.equal(applyPatchText(raw), raw)
@@ -76,6 +76,13 @@ test('registers one raw patch string tool and filters native edit reversibly', a
     assert.deepEqual(assembled.tools.map(tool => tool.name), ['apply_patch'])
     assert.deepEqual(assembled.sections.map(section => section.name), ['tool:write', 'tool:apply-patch'])
     assert.match(assembled.sections[0].text, /prefer apply_patch/u)
+    assert.equal(definition.description, 'Create, update, move, and delete files by applying a patch.')
+    assert.doesNotMatch(definition.description, /Codex|custom|freeform|preflight|rollback|transport/iu)
+    assert.doesNotMatch(assembled.sections[1].text, /Codex|custom|freeform|preflight|rollback|transport/iu)
+    assert.equal(
+      definition.parameters.properties.patch.description,
+      'Patch text containing one or more file operations.',
+    )
     const value = {
       summary: 'Done!',
       diff: '--- a\n+++ b',
@@ -94,7 +101,7 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-apply-patch')
-  assert.equal(pkg.version, '0.1.2')
+  assert.equal(pkg.version, '0.1.3')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')

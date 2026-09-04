@@ -21,9 +21,9 @@ export const Config: z<Config> = z.object({
 
 type ResolvedConfig = Required<Config>
 
-const TOOL_DESCRIPTION = 'The `apply_patch` tool can be used to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON.'
+const TOOL_DESCRIPTION = 'Create, update, move, and delete files by applying a patch.'
 
-const TOOL_GUIDANCE = `Use apply_patch for code edits. It is a freeform tool: send the patch directly, without JSON or a patch field. A patch may contain multiple Add File, Update File, Move to, and Delete File operations. The complete patch is preflighted before any target changes; a failed transaction is rolled back.`
+const TOOL_GUIDANCE = `Use apply_patch for file edits. Send patch text directly, without JSON or a patch field. Enclose one or more Add File, Update File, Move to, or Delete File operations between *** Begin Patch and *** End Patch.`
 const NATIVE_EDIT_TOOL_NAMES = new Set(['edit', 'str_replace_editor'])
 
 /** Accept the restored raw transport and the legacy envelope for compatibility. */
@@ -77,7 +77,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       patch: {
         type: 'string',
         required: true,
-        description: 'Raw Codex patch envelope. The model emits this string directly through the custom tool protocol.',
+        description: 'Patch text containing one or more file operations.',
       },
     },
     output: {

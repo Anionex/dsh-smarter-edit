@@ -68,7 +68,7 @@ pnpm install --frozen-lockfile
 pnpm run check
 pnpm pack
 
-dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.2.tgz
+dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.3.tgz
 dsh --profile web --dump-config | grep tool-apply-patch
 ```
 
