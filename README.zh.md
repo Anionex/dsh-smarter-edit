@@ -54,7 +54,7 @@ Lark grammar 与 OpenAI Codex 提交 `8e6a44b428e31f91b21edc97904fcdf4f0931ade` 
 
 DSH `0.1.x` 的公开工具定义只有 JSON Schema，并且到 provider adapter 之前会丢弃 custom-tool 元数据。本插件在受支持 alpha 与 rc 版本共有的请求冻结模型快照边界 `PiAiAdapter.current()` 安装一个范围严格、引用计数、可卸载的桥，只给结构完全匹配的 `apply_patch` 增加随包附带的 OpenAI Lark grammar。
 
-在 pi-ai OpenAI Responses 路由上，桥无需模型能力标志就会选择 grammar custom-tool 传输。provider 请求包含 OpenAI `type: "custom"` 工具及原始输入。没有 freeform custom-tool 原语的其他 provider 协议仍使用自身的普通 JSON 工具传输；插件不会因此禁用这些模型。
+在 pi-ai OpenAI Responses 路由上，桥无需模型能力标志就会选择 grammar custom-tool 传输。provider 请求包含 OpenAI `type: "custom"` 工具及原始输入。没有 freeform custom-tool 原语的其他 provider 协议仍使用自身的普通 JSON 工具传输；插件不会因此禁用这些模型。具体而言，pi-ai 的 Anthropic Messages 和 Google Generative AI serializer 无法提供 provider 线上的原始 custom-tool 输入。
 
 插件通过 DSH 公开的 `llm/stream` middleware，在 DSH 组装、执行或持久化已完成工具调用之前移除临时单字段 envelope。后续模型步骤重放原始 Session 历史时，pi-ai replay bridge 只在 adapter 内部临时恢复该 envelope。因此已完成调用的实时参数、Session 日志和轨迹参数视图都是原始 patch 文本，且不会破坏下一模型步骤。
 
@@ -67,7 +67,7 @@ pnpm install --frozen-lockfile
 pnpm run check
 pnpm pack
 
-dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.0.tgz
+dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.1.tgz
 dsh --profile web --dump-config | grep tool-apply-patch
 ```
 

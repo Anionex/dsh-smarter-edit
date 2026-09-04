@@ -1,6 +1,6 @@
 {
   "name": "@anionex/dsh-apply-patch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A better approach to editing files in DSH.",
   "homepage": "https://github.com/Anionex/dsh-apply-patch#readme",
   "publishConfig": {

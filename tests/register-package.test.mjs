@@ -87,6 +87,7 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-apply-patch')
+  assert.equal(pkg.version, '0.1.1')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')
@@ -106,6 +107,8 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   await access(new URL(pkg.types, root))
   await access(new URL(pkg.dsh.bundle.patch, root))
   await access(new URL('third_party/codex/apply_patch.lark', root))
+  await access(new URL('third_party/codex/LICENSE', root))
+  await access(new URL('third_party/codex/NOTICE', root))
 
   for (const [dependency, specifier] of Object.entries(pkg.devDependencies ?? {})) {
     assert.equal(

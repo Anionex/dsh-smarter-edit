@@ -54,7 +54,7 @@ The transaction is **failure-atomic**, not a crash-safe filesystem transaction. 
 
 DSH `0.1.x` exposes only JSON-schema tool definitions and strips custom-tool metadata before the provider adapter. This plugin installs a narrow, reference-counted bridge at `PiAiAdapter.current()`, the request-frozen model snapshot boundary shared by supported alpha and rc builds, and enriches only the exact `apply_patch` schema with the bundled OpenAI Lark grammar.
 
-On pi-ai OpenAI Responses routes, the bridge selects grammar custom-tool transport without requiring a model capability flag. The provider request contains an OpenAI `type: "custom"` tool with raw input. Other provider protocols that have no freeform custom-tool primitive use their ordinary JSON tool transport; the plugin does not disable those models.
+On pi-ai OpenAI Responses routes, the bridge selects grammar custom-tool transport without requiring a model capability flag. The provider request contains an OpenAI `type: "custom"` tool with raw input. Other provider protocols that have no freeform custom-tool primitive use their ordinary JSON tool transport; the plugin does not disable those models. In particular, pi-ai's Anthropic Messages and Google Generative AI serializers cannot provide provider-wire raw custom-tool input.
 
 DSH's public `llm/stream` middleware removes the temporary single-property envelope before DSH assembles, executes, or persists a completed tool call. A pi-ai replay bridge restores that envelope only inside the adapter when a later model step replays raw Session history. Live completed arguments, Session logs, and the Trajectory parameter view therefore contain raw patch text without breaking the following model step.
 
@@ -67,7 +67,7 @@ pnpm install --frozen-lockfile
 pnpm run check
 pnpm pack
 
-dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.0.tgz
+dsh plugin --profile web add ./anionex-dsh-apply-patch-0.1.1.tgz
 dsh --profile web --dump-config | grep tool-apply-patch
 ```
 
