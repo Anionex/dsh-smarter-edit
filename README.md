@@ -135,7 +135,6 @@ difference can reject the edit and trigger retries or fallback tools.
 Besides changing the editing tool exposed to the model, Smarter Edit supports:
 
 - multiple ordered hunks;
-- multiple files in one patch;
 - add, update, move, and delete operations;
 - Codex-compatible contextual matching;
 - failure-atomic preflight and rollback;
@@ -178,6 +177,9 @@ active. Unloading it restores the original tools.
 - Write permission from the active DSH sandbox. `workspace-write` keeps its
   configured boundary; `danger-full-access` can allow absolute and
   parent-relative paths outside it.
+- Rollback on handled failures protects file state, not retry cost. If one hunk
+  in a large patch fails, the whole patch is rejected and a retry must submit
+  the full patch again.
 - A broad patch can change or delete several files. Review the requested patch
   and the resulting diff when a change has a large scope.
 

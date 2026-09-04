@@ -45,6 +45,10 @@ preflight, stage, commit, or verification failure leaves no partial target
 changes when rollback succeeds. Process termination, kernel failure, power
 loss, or rollback I/O failure can still leave recovery files.
 
+Failure atomicity does not bound retry cost. Any failed operation rejects the
+whole patch, and a retry must submit the full patch again. The plugin imposes no
+fixed patch-size limit, so this cost grows with the size of the patch.
+
 ## Freeform transport
 
 DSH `0.1.x` exposes JSON-schema tool definitions and strips custom-tool metadata
