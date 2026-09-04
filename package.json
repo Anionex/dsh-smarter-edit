@@ -42,6 +42,7 @@
     "scripts",
     "third_party",
     "assets",
+    "docs",
     "cordis.patch.yml",
     "CHANGELOG.md",
     "CODE_OF_CONDUCT.md",

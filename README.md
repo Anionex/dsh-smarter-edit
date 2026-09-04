@@ -8,12 +8,12 @@
 [![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
 [![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-smarter-edit?style=flat-square&label=release)](https://github.com/Anionex/dsh-smarter-edit/releases)
 
-**A better editing interface for DeepSeek Harness.**
+**A better file-editing tool for DeepSeek Harness.**
 
 DSH's native `edit` requires coding models to reconstruct exact source strings
 and send both old and new code through structured JSON arguments.
 
-DSH Smarter Edit replaces that interface with Codex-compatible freeform
+DSH Smarter Edit replaces `edit` with Codex-compatible freeform
 `apply_patch`, allowing the model to express code changes directly as a diff.
 Its goal is to reduce editing failures and token overhead created by the editor
 protocol itself.
@@ -33,7 +33,7 @@ The model describes the change instead of reconstructing an exact
 **Let the model spend its tokens on changing code, not satisfying the editor
 protocol.**
 
-![DSH Smarter Edit: a better editing interface for DeepSeek Harness](assets/hero.png)
+![DSH Smarter Edit: a better file-editing tool for DeepSeek Harness](assets/hero.png)
 
 ## Why this exists
 
@@ -53,9 +53,9 @@ old_string differs in whitespace, indentation, or characters
 The edit fails
 ```
 
-That is a **protocol failure**, not a coding failure. Smarter Edit removes the
-exact-string pair from the model-facing interface and lets contextual patch
-hunks locate the change.
+The model chose the code change correctly, but the tool rejects it during
+argument matching. Smarter Edit removes the exact-string pair from the
+model-facing tool and lets contextual patch hunks locate the change.
 
 ### 2. Source duplication
 
@@ -98,24 +98,21 @@ language itself.
 
 ## Evidence from OpenAI
 
-OpenAI moved `apply_patch` to a named freeform tool interface. Its
+OpenAI moved `apply_patch` to a named freeform tool. Its
 [official model guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2)
 reports that this change reduced `apply_patch` failure rates by **35% in
 testing** compared with JSON-formatted function calling.
 
 The result measures `apply_patch` call failures. It does not measure task
-success, SWE-bench performance, or token savings. It shows that tool interface
-design itself measurably affects editing reliability.
+success, SWE-bench performance, or token savings. It shows that the input format
+of an editing tool measurably affects reliability.
 
-## Why read representation matters
+## Evidence of exact-string fragility
 
-Exact-string editing depends on the model seeing the same source representation
-that the mutation tool matches. If a read layer adds line-number gutters,
-changes tabs to spaces, or normalizes line endings while the edit tool matches
-raw file contents, the model must reverse that transformation before every
-edit.
-
-Public Claude Code issue reports document this failure class:
+Literal replacement succeeds only when `old_string` reproduces the target
+exactly. Public Claude Code issue reports show how tabs, line endings, and other
+invisible details can turn a valid code change into
+`String to replace not found in file`:
 
 - [#13152](https://github.com/anthropics/claude-code/issues/13152) reports tabs
   appearing as spaces in read output, followed by exact-match edit failures.
@@ -128,13 +125,14 @@ Public Claude Code issue reports document this failure class:
   repeated edit-fail, retry, and Python/Bash fallback cycle on tab-indented
   files.
 
-These are user-reported issues from another harness, not evidence about DSH's
-read implementation. Smarter Edit addresses the editing side of the problem;
-raw-source reading remains a separate harness concern.
+These reports describe another coding tool and do not establish DSH behavior.
+They expose the underlying weakness of literal replacement: the model must
+reproduce file details that are unrelated to the intended code change. Any
+difference can reject the edit and trigger retries or fallback tools.
 
 ## Additional capabilities
 
-Besides replacing the model-facing editing protocol, Smarter Edit supports:
+Besides changing the editing tool exposed to the model, Smarter Edit supports:
 
 - multiple ordered hunks;
 - multiple files in one patch;
@@ -162,98 +160,35 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
 
 ## How it works
 
-1. The model sends one patch between `*** Begin Patch` and `*** End Patch`.
-2. The parser builds an ordered operation plan. The host resolves each path
-   through the active DSH sandbox.
-3. The engine preflights the complete plan, stages replacement contents,
-   commits targets, and verifies the result. A handled failure triggers
-   reverse-order rollback.
-4. The tool returns an operation summary, a canonical unified diff, and
-   per-hunk presentation metadata.
-5. DSH stores the raw patch in Session history. The bundled Web client registers
-   through DSH's official keyed toolview slot and replays the native `DiffBlock`.
+1. The model sends a patch between `*** Begin Patch` and `*** End Patch`.
+2. Smarter Edit validates the complete patch, locates each change from its
+   context, and applies it through the active DSH sandbox. A handled failure
+   rolls back published changes.
+3. DSH stores the raw patch and renders the result with its native diff view.
 
 The plugin removes model-visible `edit`, `write`, and legacy
 `str_replace_editor` plus their prompt sections while replacement mode is
-active. Unloading it restores the original tool surface. The pure engine is
-available from `@anionex/dsh-smarter-edit/engine`; the DSH adapter lives in
-`src/host.ts` and `src/index.ts`.
+active. Unloading it restores the original tools.
 
 ## Compatibility and limitations
 
 - DSH `>=0.1.1-rc.1 <0.2.0`.
 - Node.js `^22.19.0 || >=24.0.0` for package development and direct engine use.
 - `desktop`, `web`, and `headless` Profiles.
-- OpenAI Responses through pi-ai for provider-wire raw custom-tool input.
-  Anthropic Messages and Google Generative AI keep their ordinary JSON tool
-  transport because those serializers do not expose a freeform custom-tool
-  primitive.
 - Write permission from the active DSH sandbox. `workspace-write` keeps its
   configured boundary; `danger-full-access` can allow absolute and
   parent-relative paths outside it.
 - A broad patch can change or delete several files. Review the requested patch
   and the resulting diff when a change has a large scope.
-- Historical calls without presentation metadata fall back to plain output
-  instead of reconstructing a diff from untrusted text.
 
 The project is pre-1.0. Compatibility targets the declared DSH `0.1.x` range;
 release verification installs the tarball into a clean Profile.
 
-## Codex compatibility
+## Implementation details
 
-The grammar is byte-identical to OpenAI Codex commit
-`8e6a44b428e31f91b21edc97904fcdf4f0931ade`. The parser state machine, ordered
-replacement computation, four-pass sequence matching, context-line handling,
-and `PreserveLineEndings` reconstruction are TypeScript ports of that revision.
-
-Tests run the complete 25-scenario official portable corpus. Twenty-four
-scenarios match the upstream final state exactly. Scenario 015 asserts the one
-intentional difference: upstream keeps earlier writes when a later operation
-fails, while this plugin preflights all operations and rolls back published
-targets.
-
-The project uses the MIT License. Codex-derived grammar, fixtures, and ported
-implementation retain their Apache-2.0 license and NOTICE attribution under
-`third_party/codex/`; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Safety and atomicity
-
-- Parses and validates the complete patch before mutating a target.
-- Locates update hunks with Codex-compatible exact, trailing-whitespace,
-  full-whitespace, and Unicode-punctuation matching passes.
-- Uses Codex's `PreserveLineEndings` mode. Context lines keep their endings,
-  inserted lines use the first existing ending, and updates retain Codex's
-  historical trailing-newline behavior.
-- Resolves relative paths from the Session working directory, accepts absolute
-  paths, and follows symbolic links. DSH's active sandbox remains the permission
-  boundary.
-- Stages every new file body before commit, avoids clobbering a concurrently
-  created path, captures and validates backups, verifies final contents, and
-  rolls published targets back in reverse order after a detected failure.
-- Returns a canonical unified diff and operation summary.
-
-The transaction is **failure-atomic**, not crash-atomic. A handled parse,
-preflight, stage, commit, or verification failure leaves no partial target
-changes when rollback succeeds. Process termination, kernel failure, power
-loss, or rollback I/O failure can still leave recovery files.
-
-## Freeform transport
-
-DSH `0.1.x` exposes JSON-schema tool definitions and strips custom-tool metadata
-before the provider adapter. This plugin installs a narrow, reference-counted
-bridge at `PiAiAdapter.current()`, the request-frozen model snapshot boundary,
-and enriches only the exact `apply_patch` schema with the bundled OpenAI Lark
-grammar.
-
-On pi-ai OpenAI Responses routes, the provider request contains an OpenAI
-`type: "custom"` tool with raw input. Other provider protocols retain their
-ordinary JSON tool transport.
-
-DSH's public `llm/stream` middleware removes pi-ai's temporary single-property
-envelope before DSH assembles, executes, or persists a completed call. A replay
-bridge restores that envelope only inside the adapter when a later model step
-replays raw Session history. Live arguments, Session logs, and the Trajectory
-parameter view therefore contain raw patch text.
+See [Implementation Notes](docs/implementation.md) for Codex alignment,
+failure atomicity, line-ending behavior, package entry points, and provider
+transport.
 
 ## Syntax
 
