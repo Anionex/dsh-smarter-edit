@@ -11,7 +11,7 @@ export const name = '@anionex/dsh-apply-patch'
 export const inject = ['tools', 'fs', 'llm', 'systemPrompt']
 
 export interface Config {
-  /** Remove the native edit schema and guidance while this plugin is active. */
+  /** Remove native file-mutation schemas and guidance while this plugin is active. */
   replaceNativeEdit?: boolean
 }
 
@@ -24,7 +24,8 @@ type ResolvedConfig = Required<Config>
 const TOOL_DESCRIPTION = 'Create, update, move, and delete files by applying a patch.'
 
 const TOOL_GUIDANCE = `Use apply_patch for file edits. Send patch text directly, without JSON or a patch field. Enclose one or more Add File, Update File, Move to, or Delete File operations between *** Begin Patch and *** End Patch.`
-const NATIVE_EDIT_TOOL_NAMES = new Set(['edit', 'str_replace_editor'])
+const NATIVE_MUTATION_TOOL_NAMES = new Set(['edit', 'write', 'str_replace_editor'])
+const NATIVE_MUTATION_SECTION_NAMES = new Set(['tool:edit', 'tool:write'])
 
 /** Accept the restored raw transport and the legacy envelope for compatibility. */
 export function applyPatchText(args: unknown): string {
@@ -60,12 +61,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       const assembled = await next()
       return {
         ...assembled,
-        tools: assembled.tools.filter(tool => !NATIVE_EDIT_TOOL_NAMES.has(tool.name)),
-        sections: assembled.sections
-          .filter(section => section.name !== 'tool:edit')
-          .map(section => section.name === 'tool:write'
-            ? { ...section, text: section.text.replace('prefer edit for targeted changes', 'prefer apply_patch for targeted changes') }
-            : section),
+        tools: assembled.tools.filter(tool => !NATIVE_MUTATION_TOOL_NAMES.has(tool.name)),
+        sections: assembled.sections.filter(section => !NATIVE_MUTATION_SECTION_NAMES.has(section.name)),
       }
     })
   }

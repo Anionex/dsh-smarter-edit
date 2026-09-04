@@ -138,10 +138,47 @@ test('restores raw patch deltas and final arguments without touching other chunk
   assert.equal(chunks[1].argumentsDelta + chunks[2].argumentsDelta, patch)
   assert.equal(chunks[3].block.arguments, patch)
   assert.equal(unwrapApplyPatchArguments(patch), patch)
+  assert.equal(unwrapApplyPatchArguments(JSON.stringify({ input: patch })), patch)
   assert.throws(
     () => unwrapApplyPatchArguments(JSON.stringify({ patch, extra: true })),
     /expected raw custom-tool input/u,
   )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({ input: patch, extra: true })),
+    /expected raw custom-tool input/u,
+  )
+})
+
+test('restores raw patch input from pi-ai fallback envelopes', async () => {
+  const patch = '*** Begin Patch\n*** Add File: fallback.txt\n+fallback\n*** End Patch'
+  const envelope = JSON.stringify({ input: patch })
+  async function* source() {
+    for (const [index, character] of [...envelope].entries()) {
+      yield {
+        type: 'tool-call-delta',
+        index: 1,
+        ...(index === 0 ? { name: 'apply_patch' } : {}),
+        argumentsDelta: character,
+      }
+    }
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: 'call-1',
+        name: 'apply_patch',
+        arguments: envelope,
+      },
+    }
+  }
+
+  const chunks = []
+  for await (const chunk of unwrapApplyPatchStream(source())) chunks.push(chunk)
+  assert.equal(chunks
+    .filter(chunk => chunk.type === 'tool-call-delta')
+    .map(chunk => chunk.argumentsDelta).join(''), patch)
+  assert.equal(chunks.at(-1).block.arguments, patch)
 })
 
 test('rewraps only raw historical apply_patch calls for pi-ai replay', () => {

@@ -79,14 +79,16 @@ export function unwrapApplyPatchArguments(serialized: string): string {
   if (serialized.startsWith('*** Begin Patch')) return serialized
   try {
     const parsed = JSON.parse(serialized) as unknown
-    if (
-      typeof parsed === 'object'
-      && parsed !== null
-      && !Array.isArray(parsed)
-      && Object.keys(parsed).length === 1
-      && typeof (parsed as Record<string, unknown>).patch === 'string'
-    ) {
-      return (parsed as { patch: string }).patch
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const [entry] = Object.entries(parsed as Record<string, unknown>)
+      if (
+        entry !== undefined
+        && Object.keys(parsed).length === 1
+        && (entry[0] === 'patch' || entry[0] === 'input')
+        && typeof entry[1] === 'string'
+      ) {
+        return entry[1]
+      }
     }
   } catch {
     // Fall through to the version-mismatch error below.

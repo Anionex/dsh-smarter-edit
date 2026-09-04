@@ -3,7 +3,7 @@ import z from '@deepseek-ai/schemastery';
 export declare const name = "@anionex/dsh-apply-patch";
 export declare const inject: string[];
 export interface Config {
-    /** Remove the native edit schema and guidance while this plugin is active. */
+    /** Remove native file-mutation schemas and guidance while this plugin is active. */
     replaceNativeEdit?: boolean;
 }
 export declare const Config: z<Config>;

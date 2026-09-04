@@ -1,0 +1,21 @@
+name: Question
+description: Ask how to install, configure, or extend the plugin.
+title: "[Question]: "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: Please search existing issues and README.md or README.zh.md first.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Include the exact command, configuration, or patch syntax you are asking about.
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Environment
+      description: DSH version, package version, profile, provider, and installation method.
+      placeholder: e.g. DSH 0.1.1-rc.1, plugin 0.1.4, desktop, installed from npm

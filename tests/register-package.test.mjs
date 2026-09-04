@@ -4,7 +4,7 @@ import { isAbsolute } from 'node:path'
 import test from 'node:test'
 import { apply, applyPatchText, inject, name } from '../lib/index.js'
 
-test('registers one raw patch string tool and filters native edit reversibly', async () => {
+test('registers one raw patch string tool and filters native mutation tools', async () => {
   let definition
   let middleware
   let llmMiddleware
@@ -64,7 +64,12 @@ test('registers one raw patch string tool and filters native edit reversibly', a
     assert.equal(chunks.at(-1).block.arguments, raw)
 
     const assembled = await middleware({}, {}, async () => ({
-      tools: [{ name: 'edit' }, { name: 'str_replace_editor' }, { name: 'apply_patch' }],
+      tools: [
+        { name: 'edit' },
+        { name: 'write' },
+        { name: 'str_replace_editor' },
+        { name: 'apply_patch' },
+      ],
       sections: [
         { name: 'tool:edit', text: 'native edit' },
         { name: 'tool:write', text: 'Use write and prefer edit for targeted changes.' },
@@ -74,11 +79,10 @@ test('registers one raw patch string tool and filters native edit reversibly', a
       variables: {},
     }))
     assert.deepEqual(assembled.tools.map(tool => tool.name), ['apply_patch'])
-    assert.deepEqual(assembled.sections.map(section => section.name), ['tool:write', 'tool:apply-patch'])
-    assert.match(assembled.sections[0].text, /prefer apply_patch/u)
+    assert.deepEqual(assembled.sections.map(section => section.name), ['tool:apply-patch'])
     assert.equal(definition.description, 'Create, update, move, and delete files by applying a patch.')
     assert.doesNotMatch(definition.description, /Codex|custom|freeform|preflight|rollback|transport/iu)
-    assert.doesNotMatch(assembled.sections[1].text, /Codex|custom|freeform|preflight|rollback|transport/iu)
+    assert.doesNotMatch(assembled.sections[0].text, /Codex|custom|freeform|preflight|rollback|transport/iu)
     assert.equal(
       definition.parameters.properties.patch.description,
       'Patch text containing one or more file operations.',
@@ -96,12 +100,34 @@ test('registers one raw patch string tool and filters native edit reversibly', a
   }
 })
 
+test('keeps native mutation tools when replacement is disabled', async () => {
+  let middleware
+  const disposers = []
+  const ctx = {
+    fs: { sandboxMode: undefined },
+    tools: { register() { return () => undefined } },
+    systemPrompt: { section() { return () => undefined } },
+    effect(setup) { disposers.push(setup()) },
+    on(event, listener) {
+      if (event === 'system-prompt/assemble') middleware = listener
+      return () => undefined
+    },
+  }
+
+  await apply(ctx, { replaceNativeEdit: false })
+  try {
+    assert.equal(middleware, undefined)
+  } finally {
+    for (const dispose of disposers.reverse()) dispose()
+  }
+})
+
 test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const root = new URL('../', import.meta.url)
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-apply-patch')
-  assert.equal(pkg.version, '0.1.3')
+  assert.equal(pkg.version, '0.1.4')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')
@@ -114,6 +140,9 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   assert.ok(pkg.files.includes('lib'))
   assert.ok(pkg.files.includes('src'))
   assert.ok(pkg.files.includes('third_party'))
+  assert.ok(pkg.files.includes('assets'))
+  assert.ok(pkg.files.includes('CHANGELOG.md'))
+  assert.ok(pkg.files.includes('SECURITY.md'))
   assert.equal(typeof pkg.scripts.build, 'string')
   assert.equal(typeof pkg.scripts.prepack, 'string')
   assert.match(workspace, /^packages:\n  - \.$/mu)

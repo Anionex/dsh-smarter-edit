@@ -1,0 +1,56 @@
+name: Bug report
+description: Report behavior that is incorrect or unexpected.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a bug. A minimal reproduction is the fastest path to a fix.
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: npm version of @anionex/dsh-apply-patch.
+      placeholder: e.g. 0.1.4
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: DSH version, Node.js version, profile, provider, and operating system.
+      placeholder: e.g. DSH 0.1.1-rc.1, Node.js 24, desktop, OpenAI Responses, macOS
+    validations:
+      required: true
+  - type: textarea
+    id: patch
+    attributes:
+      label: Patch input
+      description: The smallest apply_patch call that reproduces the problem. Remove secrets and private paths first.
+      render: diff
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exact error, rollback notice, or diff-card symptom.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed credentials, private paths, and sensitive source code.
+          required: true
+        - label: This is not a security issue; security reports follow SECURITY.md.
+          required: true
