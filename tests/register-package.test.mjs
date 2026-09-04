@@ -147,6 +147,14 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   assert.equal(typeof pkg.scripts.prepack, 'string')
   assert.match(workspace, /^packages:\n  - \.$/mu)
   assert.match(workspace, /^nodeLinker: hoisted$/mu)
+  assert.match(workspace, /^minimumReleaseAge: 1440$/mu)
+  for (const exclusion of [
+    '@smithy/fetch-http-handler@5.8.0',
+    '@smithy/node-http-handler@4.12.1',
+    '@smithy/types@4.18.0',
+  ]) {
+    assert.match(workspace, new RegExp(`^  - '${exclusion.replaceAll('.', '\\.')}'$`, 'mu'))
+  }
   assert.match(workspace, /^autoInstallPeers: false$/mu)
   await access(new URL(pkg.main, root))
   await access(new URL(pkg.types, root))
