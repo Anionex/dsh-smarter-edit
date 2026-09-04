@@ -8,81 +8,128 @@
 [![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
 [![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-smarter-edit?style=flat-square&label=release)](https://github.com/Anionex/dsh-smarter-edit/releases)
 
-**为 DeepSeek Harness 提供更适合 coding agent 的文件编辑接口。**
+**为 DeepSeek Harness 提供更好的编辑接口。**
 
-DSH Smarter Edit 用兼容 Codex 的 freeform `apply_patch` 替换 DSH
-模型可见的精确字符串 `edit`。Coding agent 可以在一次调用中表达跨多个文件的
-多个 hunk；DSH 会保留原始 patch，并通过原生 diff UI 展示结果。
+DSH 原生 `edit` 要求 coding model 重新构造精确的源码字符串，并通过结构化 JSON
+参数同时发送修改前和修改后的代码。
 
-![DSH Smarter Edit：为 DeepSeek Harness 提供更好的文件编辑接口](assets/hero.png)
-
-## 为什么需要它
-
-DSH 原生 `edit(file_path, old_string, new_string)` 很适合单个、小范围且唯一的
-精确替换。面对相关修改时，模型通常需要这样调用：
-
-```text
-edit(fileA, old1, new1)
-edit(fileA, old2, new2)
-edit(fileB, old3, new3)
-```
-
-每次调用都有一层 JSON 参数，并要求模型复现精确的源码子串。只要某个子串匹配
-失败，agent 就可能需要重新读取文件、增加一个模型 round，再发起一次修改调用。
-
-DSH Smarter Edit 把这些修改合并为一个编辑动作：
+DSH Smarter Edit 用兼容 Codex 的 freeform `apply_patch` 替换这套接口，让模型
+直接用 diff 表达代码变化。
+它的目标是减少编辑协议本身造成的失败和 token 开销。
 
 ```diff
 *** Begin Patch
-*** Update File: fileA
+*** Update File: src/app.ts
 @@
--old1
-+new1
-@@
--old2
-+new2
-*** Update File: fileB
-@@
--old3
-+new3
+-const result = oldMethod(value)
++const result = newMethod(value)
 *** End Patch
 ```
 
-一个模型动作包含三处替换、执行顺序和文件边界。单个微小精确替换仍适合原生
-`edit`；`apply_patch` 主要解决 coding agent 在复杂、相关修改中重复发送上下文
-和工具调用的问题。
+模型描述代码变化，不再重新构造精确的 `old_string` / `new_string` 参数对。
 
-## 为什么选择 apply_patch
+**让模型把 token 用在修改代码上，而不是满足编辑协议。**
 
-- **一次表达多个 hunk。** 多处修改不再要求每个 replacement 都调用一次工具。
-- **一次规划多个文件。** 新增、更新、移动和删除共享同一套有序预演与失败边界。
-- **用上下文定位，而非复现完整旧字符串。** Hunk 只携带定位修改所需的行，并按
-  Codex 兼容顺序尝试匹配。
-- **在支持的路由上直接发送模型输出。** OpenAI Responses 接收具名 freeform
-  custom-tool 输入，不需要把 patch 变成经过 JSON 转义的字符串。
+![DSH Smarter Edit：为 DeepSeek Harness 提供更好的编辑接口](assets/hero.png)
 
-[OpenAI 官方文档](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2)
-报告称，具名 freeform `apply_patch` 函数在测试中让 `apply_patch` 的失败率
-**降低了 35%**，对照对象是 JSON 格式方案。这个数字只描述 `apply_patch`
-调用失败率，不代表任务成功率、SWE-bench 成绩或 token 节省比例。
+## 为什么需要它
 
-这个接口面向相关修改减少编辑开销。合并修改可以减少重复的 tool-call envelope；
-原始 patch 不需要 JSON quoting 和 escaping；每个 hunk 只复现定位所需的上下文，
-不必为每处 replacement 单独复制完整 `old_string`。编辑失败减少后，也可能省去
-reread 和 retry round。在项目自己的 A/B benchmark 给出数据前，维护者不会公布
-具体 token 节省比例。
+Coding model 本来只需要解决一个问题：代码应该怎么改。DSH 原生编辑协议又强加
+了三项工作。
 
-## 原生 edit 与 Smarter Edit 对比
+### 1. 精确重构旧源码
 
-| DSH 原生 `edit` | DSH Smarter Edit |
-| --- | --- |
-| 精确替换 `old_string` | 通过上下文 hunk 定位 |
-| 通常每次调用完成一处替换 | 一次调用可包含多个有序 hunk |
-| 跨文件修改需要多次工具调用 | 一个 patch 可覆盖多个文件 |
-| 使用结构化 JSON 参数 | 支持的路由使用原始 freeform patch 输入 |
-| 每次修改重复一段精确源码 | 每个 hunk 只重复定位所需的上下文 |
-| 每次成功调用独立提交 | 对可处理的多文件失败先完整预演，再回滚 |
-| 单个微小精确替换通常更短 | 设计目标是减少复杂相关修改的编辑协议开销 |
+原生 `edit(file_path, old_string, new_string)` 要求模型重新生成已经读取过的
+源码，并让 `old_string` 与文件内容精确匹配：
+
+```text
+模型知道代码应该怎么改
+        ↓
+old_string 的空白、缩进或字符与文件不完全一致
+        ↓
+编辑失败
+```
+
+这是**协议失败**，不是编程失败。Smarter Edit 从模型可见接口中移除精确字符串
+参数对，改用带上下文的 patch hunk 定位修改。
+
+### 2. 重复输出源码
+
+精确字符串编辑要求模型同时输出已有代码块和新代码块，而两者的大部分内容往往
+相同：
+
+```text
+old_string = 已经存在的源码
+new_string = 大量相同源码 + 实际变化
+```
+
+Patch 只表达变化行和定位所需的上下文：
+
+```diff
+ 必要上下文
+-变化前
++变化后
+ 必要上下文
+```
+
+预期的 token 节省来自少重复旧源码、少重复未变化源码、少 JSON escaping，以及
+减少精确匹配失败后的 retry。在受控 A/B 测试给出结果前，维护者不会公布具体
+节省比例。
+
+### 3. 结构化 JSON 开销
+
+模型还必须把多行源码编码进工具 schema：
+
+```json
+{
+  "old_string": "...",
+  "new_string": "..."
+}
+```
+
+Quoting、escaping 和精确匹配字段属于编辑协议，不属于代码变化本身。Freeform
+`apply_patch` 让模型直接生成编辑语言。
+
+## OpenAI 的证据
+
+OpenAI 把 `apply_patch` 改为具名 freeform 工具接口。其
+[官方模型指南](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2)
+报告称，与 JSON 格式的 function calling 相比，这项改动在测试中让
+`apply_patch` 失败率**降低了 35%**。
+
+该结果衡量的是 `apply_patch` 调用失败，不是任务成功率、SWE-bench 成绩或 token
+节省比例。它证明工具接口设计本身会显著影响编辑可靠性。
+
+## 为什么读取表示也会影响精确编辑
+
+精确字符串编辑要求模型看到的源码表示与 mutation tool 实际匹配的内容一致。
+如果读取层添加行号栏、把 tab 显示为空格，或改变换行格式，而编辑工具仍匹配
+原始文件，模型就必须在每次编辑前正确逆转这种转换。
+
+Claude Code 的公开 issue 报告记录了这类失败：
+
+- [#13152](https://github.com/anthropics/claude-code/issues/13152) 报告读取输出把
+  tab 显示为空格，随后精确匹配编辑失败。
+- [#28831](https://github.com/anthropics/claude-code/issues/28831) 报告带 tab
+  缩进的 CRLF 文件出现多行匹配不可靠，并把读取格式列为可能原因之一。
+- [#54876](https://github.com/anthropics/claude-code/issues/54876) 报告读取输出
+  使用 LF，而实际文件使用 CRLF。
+- [#40471](https://github.com/anthropics/claude-code/issues/40471) 报告在 tab
+  缩进文件上反复经历编辑失败、重试、回退到 Python/Bash 的循环。
+
+这些是另一个 harness 的用户 issue 报告，不是 DSH 读取实现的证据。Smarter Edit
+只处理这个问题的编辑端；原始源码读取属于另一项 harness 能力。
+
+## 其他能力
+
+除替换模型可见的编辑协议外，Smarter Edit 还支持：
+
+- 多个有序 hunk；
+- 一个 patch 中包含多个文件；
+- 新增、更新、移动和删除操作；
+- Codex 兼容的上下文匹配；
+- 失败原子的完整预演与回滚；
+- DSH 原生 diff 展示。
 
 ## 安装
 
@@ -126,7 +173,6 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
   custom-tool 原语，因此保留普通 JSON 工具传输。
 - 需要当前 DSH sandbox 授权写入。`workspace-write` 保留已配置的边界；
   `danger-full-access` 可以允许工作区外的绝对路径和父级相对路径。
-- 只有一个微小精确替换时，原生 `edit` 可能使用更少 token。
 - 一个范围较大的 patch 可以修改或删除多个文件；范围较大时应审查请求 patch
   和结果 diff。
 - 缺少展示元数据的历史调用会降级为普通输出，不会从不受信任文本重建 diff。

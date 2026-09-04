@@ -8,88 +8,140 @@
 [![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
 [![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-smarter-edit?style=flat-square&label=release)](https://github.com/Anionex/dsh-smarter-edit/releases)
 
-**A better file-editing interface for DeepSeek Harness.**
+**A better editing interface for DeepSeek Harness.**
 
-DSH Smarter Edit replaces DSH's model-visible exact-string `edit` with
-Codex-compatible freeform `apply_patch`. A coding agent can express multiple
-hunks across multiple files in one call, while DSH keeps the raw patch and
-shows the result with its native diff UI.
+DSH's native `edit` requires coding models to reconstruct exact source strings
+and send both old and new code through structured JSON arguments.
 
-![DSH Smarter Edit: a better file-editing interface for DeepSeek Harness](assets/hero.png)
-
-## Why this exists
-
-DSH's native `edit(file_path, old_string, new_string)` works well for one small,
-unique replacement. Related edits ask the model to make a different tradeoff:
-
-```text
-edit(fileA, old1, new1)
-edit(fileA, old2, new2)
-edit(fileB, old3, new3)
-```
-
-Each call carries a JSON envelope and an exact source substring. If a substring
-does not match, the agent may need another read, another model round, and
-another mutation call.
-
-DSH Smarter Edit gives the model one editing action instead:
+DSH Smarter Edit replaces that interface with Codex-compatible freeform
+`apply_patch`, allowing the model to express code changes directly as a diff.
+Its goal is to reduce editing failures and token overhead created by the editor
+protocol itself.
 
 ```diff
 *** Begin Patch
-*** Update File: fileA
+*** Update File: src/app.ts
 @@
--old1
-+new1
-@@
--old2
-+new2
-*** Update File: fileB
-@@
--old3
-+new3
+-const result = oldMethod(value)
++const result = newMethod(value)
 *** End Patch
 ```
 
-One model action now carries all three replacements, their order, and their
-file boundaries. Native `edit` remains a compact interface for one tiny exact
-replacement; `apply_patch` targets the larger, related changes that make coding
-agents repeat context and tool calls.
+The model describes the change instead of reconstructing an exact
+`old_string` / `new_string` pair.
 
-## Why apply_patch
+**Let the model spend its tokens on changing code, not satisfying the editor
+protocol.**
 
-- **Multiple hunks, one action.** A patch can update several locations without
-  one mutation call per replacement.
-- **Multiple files, one plan.** Add, update, move, and delete operations share
-  an ordered preflight and failure boundary.
-- **Context instead of exact whole strings.** Hunks carry the lines needed to
-  locate a change and use Codex-compatible matching passes.
-- **Raw model output on supported routes.** OpenAI Responses receives patch
-  text as named freeform custom-tool input instead of a JSON-escaped string.
+![DSH Smarter Edit: a better editing interface for DeepSeek Harness](assets/hero.png)
 
-[OpenAI reports](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2)
-that its named freeform `apply_patch` function reduced `apply_patch` failure
-rates by **35% in testing** compared with the JSON-formatted approach. The
-number describes `apply_patch` call failures. It does not describe task success,
-SWE-bench performance, or token savings.
+## Why this exists
 
-This interface is designed to reduce editing overhead on related changes.
-Combining mutations removes repeated tool-call envelopes; raw patch text avoids
-JSON quoting and escaping; focused hunk context avoids reproducing a separate
-complete `old_string` for every replacement. Fewer rejected edits can also
-remove reread and retry rounds. The maintainers will not publish a token
-percentage until the A/B benchmark produces one.
+Coding models should solve one problem: what code should change. DSH's native
+editing protocol adds three more.
 
-## Native edit vs Smarter Edit
+### 1. Exact-string reconstruction
 
-| Native DSH `edit` | DSH Smarter Edit |
-| --- | --- |
-| Exact `old_string` replacement | Contextual patch hunks |
-| Usually one replacement per call | Multiple ordered hunks per call |
-| Multi-file work requires multiple mutation calls | One patch can cover multiple files |
-| Structured JSON arguments | Raw freeform patch input on supported routes |
-| Repeats an exact source substring for each edit | Repeats only the context needed by each hunk |
-| Each completed call commits independently | Full preflight and rollback across handled multi-file failures |
-| Often shorter for one tiny exact replacement | Designed to reduce editing overhead for related, complex changes |
+Native `edit(file_path, old_string, new_string)` asks the model to regenerate
+source it has already read. The `old_string` must match the file:
+
+```text
+The model knows the correct code change
+        ↓
+old_string differs in whitespace, indentation, or characters
+        ↓
+The edit fails
+```
+
+That is a **protocol failure**, not a coding failure. Smarter Edit removes the
+exact-string pair from the model-facing interface and lets contextual patch
+hunks locate the change.
+
+### 2. Source duplication
+
+Exact-string editing makes the model output both the existing block and a new
+block that often repeats most of it:
+
+```text
+old_string = existing source
+new_string = mostly the same source + the change
+```
+
+A patch expresses the changed lines and only the context needed to locate them:
+
+```diff
+ required context
+-before
++after
+ required context
+```
+
+The intended token reduction comes from less repeated old source, less repeated
+unchanged source, less JSON escaping, and fewer retries after exact-match
+failures. The maintainers will not publish a percentage until controlled A/B
+tests produce one.
+
+### 3. Structured JSON overhead
+
+The model must also encode multiline source inside a schema:
+
+```json
+{
+  "old_string": "...",
+  "new_string": "..."
+}
+```
+
+Quoting, escaping, and the exact-match fields belong to the editor protocol,
+not the code change. Freeform `apply_patch` lets the model generate the editing
+language itself.
+
+## Evidence from OpenAI
+
+OpenAI moved `apply_patch` to a named freeform tool interface. Its
+[official model guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2)
+reports that this change reduced `apply_patch` failure rates by **35% in
+testing** compared with JSON-formatted function calling.
+
+The result measures `apply_patch` call failures. It does not measure task
+success, SWE-bench performance, or token savings. It shows that tool interface
+design itself measurably affects editing reliability.
+
+## Why read representation matters
+
+Exact-string editing depends on the model seeing the same source representation
+that the mutation tool matches. If a read layer adds line-number gutters,
+changes tabs to spaces, or normalizes line endings while the edit tool matches
+raw file contents, the model must reverse that transformation before every
+edit.
+
+Public Claude Code issue reports document this failure class:
+
+- [#13152](https://github.com/anthropics/claude-code/issues/13152) reports tabs
+  appearing as spaces in read output, followed by exact-match edit failures.
+- [#28831](https://github.com/anthropics/claude-code/issues/28831) reports
+  unreliable multiline matching on CRLF files with tab indentation and
+  identifies read formatting as one possible cause.
+- [#54876](https://github.com/anthropics/claude-code/issues/54876) reports LF
+  read output against CRLF file contents.
+- [#40471](https://github.com/anthropics/claude-code/issues/40471) reports a
+  repeated edit-fail, retry, and Python/Bash fallback cycle on tab-indented
+  files.
+
+These are user-reported issues from another harness, not evidence about DSH's
+read implementation. Smarter Edit addresses the editing side of the problem;
+raw-source reading remains a separate harness concern.
+
+## Additional capabilities
+
+Besides replacing the model-facing editing protocol, Smarter Edit supports:
+
+- multiple ordered hunks;
+- multiple files in one patch;
+- add, update, move, and delete operations;
+- Codex-compatible contextual matching;
+- failure-atomic preflight and rollback;
+- native DSH diff rendering.
 
 ## Install
 
@@ -139,7 +191,6 @@ available from `@anionex/dsh-smarter-edit/engine`; the DSH adapter lives in
 - Write permission from the active DSH sandbox. `workspace-write` keeps its
   configured boundary; `danger-full-access` can allow absolute and
   parent-relative paths outside it.
-- Native `edit` can use fewer tokens for one tiny exact replacement.
 - A broad patch can change or delete several files. Review the requested patch
   and the resulting diff when a change has a large scope.
 - Historical calls without presentation metadata fall back to plain output
