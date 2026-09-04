@@ -49,7 +49,7 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
     },
   }
   vm.runInNewContext(source, context)
-  assert.equal(bundle.id, '@anionex/dsh-apply-patch')
+  assert.equal(bundle.id, '@anionex/dsh-smarter-edit')
 
   const DiffBlock = Symbol('DiffBlock')
   const DisclosureRow = Symbol('DisclosureRow')
@@ -158,7 +158,7 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
     },
   })
   assert.equal(findElement(failure, DiffBlock), null)
-  assert.equal(findClass(failure, 'dsh-apply-patch-row__output').props['data-error'], true)
+  assert.equal(findClass(failure, 'dsh-smarter-edit-row__output').props['data-error'], true)
   assert.equal(findElement(failure, DisclosureRow).props.icon.props.state, 'error')
 
   const stopped = registration.component({
@@ -179,6 +179,6 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
       block: { ...successBlock, meta },
     })
     assert.equal(findElement(historical, DiffBlock), null)
-    assert.equal(findClass(historical, 'dsh-apply-patch-row__output').props['data-error'], false)
+    assert.equal(findClass(historical, 'dsh-smarter-edit-row__output').props['data-error'], false)
   }
 })

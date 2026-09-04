@@ -10,8 +10,8 @@ body:
     id: version
     attributes:
       label: Package version
-      description: npm version of @anionex/dsh-apply-patch.
-      placeholder: e.g. 0.1.4
+      description: npm version of @anionex/dsh-smarter-edit.
+      placeholder: e.g. 0.1.5
     validations:
       required: true
   - type: input

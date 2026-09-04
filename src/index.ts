@@ -7,7 +7,7 @@ import { installPiAiFreeformBridge, unwrapApplyPatchStream } from './freeform-br
 import { runApplyPatch } from './host.js'
 import { parsePatch } from './parser.js'
 
-export const name = '@anionex/dsh-apply-patch'
+export const name = '@anionex/dsh-smarter-edit'
 export const inject = ['tools', 'fs', 'llm', 'systemPrompt']
 
 export interface Config {
@@ -46,7 +46,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const resolved = config as ResolvedConfig
 
   const releaseBridge = await installPiAiFreeformBridge()
-  ctx.effect(() => releaseBridge, 'dsh-apply-patch pi-ai freeform bridge')
+  ctx.effect(() => releaseBridge, 'dsh-smarter-edit pi-ai freeform bridge')
   ctx.on('llm/stream', (_options, next) => unwrapApplyPatchStream(next()))
 
   ctx.systemPrompt.section({

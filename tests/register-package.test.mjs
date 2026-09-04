@@ -26,7 +26,7 @@ test('registers one raw patch string tool and filters native mutation tools', as
     replaceNativeEdit: true,
   })
   try {
-    assert.equal(name, '@anionex/dsh-apply-patch')
+    assert.equal(name, '@anionex/dsh-smarter-edit')
     assert.deepEqual(inject, ['tools', 'fs', 'llm', 'systemPrompt'])
     assert.equal(definition.name, 'apply_patch')
     assert.deepEqual(definition.parameters.required, ['patch'])
@@ -126,8 +126,8 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const root = new URL('../', import.meta.url)
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
-  assert.equal(pkg.name, '@anionex/dsh-apply-patch')
-  assert.equal(pkg.version, '0.1.4')
+  assert.equal(pkg.name, '@anionex/dsh-smarter-edit')
+  assert.equal(pkg.version, '0.1.5')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')

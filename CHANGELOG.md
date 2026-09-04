@@ -1,10 +1,20 @@
 # Changelog
 
-All notable changes to `@anionex/dsh-apply-patch` are documented here. The
+All notable changes to `@anionex/dsh-smarter-edit` are documented here. The
 format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.1.5] - 2026-09-04
+
+### Changed
+
+- Renamed the project to DSH Smarter Edit, the npm package to
+  `@anionex/dsh-smarter-edit`, and the GitHub repository to
+  `Anionex/dsh-smarter-edit`.
+- Marked the former `@anionex/dsh-apply-patch` package as deprecated so new
+  installations move to the renamed package.
 
 ## [0.1.4] - 2026-09-04
 
@@ -54,9 +64,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-apply-patch/compare/v0.1.4...HEAD
-[0.1.4]: https://github.com/Anionex/dsh-apply-patch/releases/tag/v0.1.4
-[0.1.3]: https://github.com/Anionex/dsh-apply-patch/releases/tag/v0.1.3
-[0.1.2]: https://github.com/Anionex/dsh-apply-patch/releases/tag/v0.1.2
-[0.1.1]: https://github.com/Anionex/dsh-apply-patch/releases/tag/v0.1.1
-[0.1.0]: https://github.com/Anionex/dsh-apply-patch/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.5
+[0.1.4]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.4
+[0.1.3]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.3
+[0.1.2]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.2
+[0.1.1]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.1
+[0.1.0]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.0

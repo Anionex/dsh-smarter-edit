@@ -14,7 +14,7 @@ function policyFor(ctx: Context, exec: ToolRunContext): SandboxExecutionPolicy |
   if (ctx.fs.sandboxMode === undefined) return undefined
   const policy = ctx.get('sandboxPolicy') as SandboxPolicyLike | undefined
   if (policy === undefined) {
-    throw new PatchError('dsh-apply-patch: sandboxed filesystem requires ctx.sandboxPolicy', 'PATCH_UNSUPPORTED')
+    throw new PatchError('dsh-smarter-edit: sandboxed filesystem requires ctx.sandboxPolicy', 'PATCH_UNSUPPORTED')
   }
   return policy.resolve(exec.agent === undefined ? {} : { session: exec.agent.session })
 }

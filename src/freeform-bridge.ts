@@ -46,7 +46,7 @@ interface GlobalBridgeState {
   references: number
 }
 
-const STATE_KEY = Symbol.for('@anionex/dsh-apply-patch/pi-ai-freeform-bridge')
+const STATE_KEY = Symbol.for('@anionex/dsh-smarter-edit/pi-ai-freeform-bridge')
 const globalBridge = globalThis as typeof globalThis & { [STATE_KEY]?: GlobalBridgeState }
 
 function isPatchStringSchema(parameters: unknown): boolean {
@@ -94,7 +94,7 @@ export function unwrapApplyPatchArguments(serialized: string): string {
     // Fall through to the version-mismatch error below.
   }
   throw new PatchError(
-    'dsh-apply-patch: pi-ai did not return the expected raw custom-tool input',
+    'dsh-smarter-edit: pi-ai did not return the expected raw custom-tool input',
     'PATCH_UNSUPPORTED',
   )
 }
@@ -136,7 +136,7 @@ export function rewrapApplyPatchHistory(options: unknown): unknown {
 function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
   if (state.closed) {
     if (delta.trim().length === 0) return ''
-    throw new PatchError('dsh-apply-patch: model emitted patch input after closing it', 'PATCH_UNSUPPORTED')
+    throw new PatchError('dsh-smarter-edit: model emitted patch input after closing it', 'PATCH_UNSUPPORTED')
   }
   if (state.mode === 'raw') return delta
   state.buffer += delta
@@ -154,7 +154,7 @@ function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
       return raw
     } else {
       throw new PatchError(
-        'dsh-apply-patch: model changed its patch-tool streaming envelope',
+        'dsh-smarter-edit: model changed its patch-tool streaming envelope',
         'PATCH_UNSUPPORTED',
       )
     }
@@ -196,7 +196,7 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
       && (chunk.name === APPLY_PATCH_TOOL_NAME || patchIndexes.has(chunk.index))
     ) {
       if (typeof chunk.argumentsDelta !== 'string') {
-        throw new PatchError('dsh-apply-patch: pi-ai emitted a non-string patch delta', 'PATCH_UNSUPPORTED')
+        throw new PatchError('dsh-smarter-edit: pi-ai emitted a non-string patch delta', 'PATCH_UNSUPPORTED')
       }
       const state = patchIndexes.get(chunk.index) ?? { buffer: '', mode: 'unknown', closed: false }
       patchIndexes.set(chunk.index, state)
@@ -279,7 +279,7 @@ async function loadGrammar(): Promise<string> {
   const grammarUrl = new URL('../third_party/codex/apply_patch.lark', import.meta.url)
   const grammar = await readFile(grammarUrl, 'utf8')
   if (grammar.trim().length === 0) {
-    throw new PatchError('dsh-apply-patch: bundled freeform grammar is empty', 'PATCH_UNSUPPORTED')
+    throw new PatchError('dsh-smarter-edit: bundled freeform grammar is empty', 'PATCH_UNSUPPORTED')
   }
   return grammar
 }
@@ -297,7 +297,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
   const existing = globalBridge[STATE_KEY]
   if (existing !== undefined) {
     if (existing.prototype !== prototype) {
-      throw new PatchError('dsh-apply-patch: conflicting pi-ai adapter prototype is already bridged', 'PATCH_UNSUPPORTED')
+      throw new PatchError('dsh-smarter-edit: conflicting pi-ai adapter prototype is already bridged', 'PATCH_UNSUPPORTED')
     }
     existing.references += 1
     return () => releaseBridge(existing)
@@ -306,7 +306,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
   const original = prototype.current
   if (typeof original !== 'function') {
     throw new PatchError(
-      'dsh-apply-patch: this dsh-llm-pi-ai version has no compatible current snapshot boundary',
+      'dsh-smarter-edit: this dsh-llm-pi-ai version has no compatible current snapshot boundary',
       'PATCH_UNSUPPORTED',
     )
   }
@@ -315,7 +315,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
   const wrapper: CurrentSnapshot = function(this: unknown): SnapshotLike {
     const snapshot = original.call(this)
     if (typeof snapshot !== 'object' || snapshot === null || typeof snapshot.models !== 'object') {
-      throw new PatchError('dsh-apply-patch: pi-ai adapter returned an incompatible snapshot', 'PATCH_UNSUPPORTED')
+      throw new PatchError('dsh-smarter-edit: pi-ai adapter returned an incompatible snapshot', 'PATCH_UNSUPPORTED')
     }
     const cached = bridgedSnapshots.get(snapshot)
     if (cached !== undefined) return cached
@@ -336,7 +336,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
       value: original,
     })
     throw new PatchError(
-      'dsh-apply-patch: this dsh-llm-pi-ai version has no compatible stream boundary',
+      'dsh-smarter-edit: this dsh-llm-pi-ai version has no compatible stream boundary',
       'PATCH_UNSUPPORTED',
     )
   }
@@ -360,7 +360,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
         || typeof (prepared as { stream?: unknown }).stream !== 'function'
       ) {
         throw new PatchError(
-          'dsh-apply-patch: pi-ai adapter returned an incompatible prepared call',
+          'dsh-smarter-edit: pi-ai adapter returned an incompatible prepared call',
           'PATCH_UNSUPPORTED',
         )
       }

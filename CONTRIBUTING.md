@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve DSH Apply Patch. It is a DeepSeek Harness (DSH)
+Thanks for helping improve DSH Smarter Edit. It is a DeepSeek Harness (DSH)
 plugin bundle with TypeScript source in `src/`, committed runtime artifacts in
 `lib/`, a profile patch in `cordis.patch.yml`, and tests in `tests/`.
 

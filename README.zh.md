@@ -1,18 +1,18 @@
-# DSH Apply Patch
+# DSH Smarter Edit
 
 [English](README.md)
 
-[![npm version](https://img.shields.io/npm/v/@anionex/dsh-apply-patch?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-apply-patch)
-[![License](https://img.shields.io/github/license/Anionex/dsh-apply-patch?style=flat-square)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/dsh-apply-patch/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/dsh-apply-patch/actions/workflows/ci.yml)
-[![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-apply-patch?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-apply-patch)
-[![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-apply-patch?style=flat-square&label=release)](https://github.com/Anionex/dsh-apply-patch/releases)
+[![npm version](https://img.shields.io/npm/v/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
+[![License](https://img.shields.io/github/license/Anionex/dsh-smarter-edit?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/dsh-smarter-edit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/dsh-smarter-edit/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
+[![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-smarter-edit?style=flat-square&label=release)](https://github.com/Anionex/dsh-smarter-edit/releases)
 
 **在 DeepSeek Harness 中，用一次有序、原子、可审查的 `apply_patch` 调用完成多文件修改。**
 
-DSH Apply Patch 会把模型可见的原生 `edit`、原生 `write` 与旧版 `str_replace_editor` 替换为兼容 Codex 的 `apply_patch` 工具。模型可以通过有序 hunk 新增、更新、移动和删除多个文件。插件会先预演完整 patch，在普通可处理失败时回滚，并用 DSH 原生 diff UI 展示结果。
+DSH Smarter Edit 会把模型可见的原生 `edit`、原生 `write` 与旧版 `str_replace_editor` 替换为兼容 Codex 的 `apply_patch` 工具。模型可以通过有序 hunk 新增、更新、移动和删除多个文件。插件会先预演完整 patch，在普通可处理失败时回滚，并用 DSH 原生 diff UI 展示结果。
 
-![DSH Apply Patch：一次有序、原子的 apply_patch 调用完成多文件修改](assets/hero.png)
+![DSH Smarter Edit：一次有序、原子的 apply_patch 调用完成多文件修改](assets/hero.png)
 
 ## 功能亮点
 
@@ -28,7 +28,7 @@ DSH Apply Patch 会把模型可见的原生 `edit`、原生 `write` 与旧版 `s
 把当前 npm 版本安装到 Desktop Profile：
 
 ```sh
-dsh plugin --profile desktop add @anionex/dsh-apply-patch
+dsh plugin --profile desktop add @anionex/dsh-smarter-edit
 ```
 
 安装到其他 Profile 时，把 `desktop` 换成 `web` 或 `headless`。安装后重启正在运行的 Profile，并新建 Session。
@@ -80,7 +80,7 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
 4. 工具返回操作摘要、标准 unified diff 和按 hunk 组织的展示元数据。
 5. DSH 在 Session 历史中保存原始 patch；Web 客户端用展示元数据回放原生 diff 卡片。
 
-纯引擎从 `@anionex/dsh-apply-patch/engine` 导出，不依赖 Cordis。DSH 适配位于 `src/host.ts` 和 `src/index.ts`。
+纯引擎从 `@anionex/dsh-smarter-edit/engine` 导出，不依赖 Cordis。DSH 适配位于 `src/host.ts` 和 `src/index.ts`。
 
 ## 保证
 
@@ -194,7 +194,7 @@ pnpm run check
 
 - 通过 [SECURITY.md](SECURITY.md) 私下报告安全问题。
 - 通过 [SUPPORT.md](SUPPORT.md) 获取使用帮助。
-- 按 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [issue tracker](https://github.com/Anionex/dsh-apply-patch/issues) 提交修改建议。
+- 按 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [issue tracker](https://github.com/Anionex/dsh-smarter-edit/issues) 提交修改建议。
 - 在 [CHANGELOG.md](CHANGELOG.md) 查看版本历史。
 - 社区参与遵循 [Code of Conduct](CODE_OF_CONDUCT.md)。
 

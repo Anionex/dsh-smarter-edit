@@ -1,17 +1,17 @@
 {
-  "name": "@anionex/dsh-apply-patch",
-  "version": "0.1.4",
+  "name": "@anionex/dsh-smarter-edit",
+  "version": "0.1.5",
   "description": "A better approach to editing files in DSH.",
-  "homepage": "https://github.com/Anionex/dsh-apply-patch#readme",
+  "homepage": "https://github.com/Anionex/dsh-smarter-edit#readme",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Anionex/dsh-apply-patch.git"
+    "url": "git+https://github.com/Anionex/dsh-smarter-edit.git"
   },
   "bugs": {
-    "url": "https://github.com/Anionex/dsh-apply-patch/issues"
+    "url": "https://github.com/Anionex/dsh-smarter-edit/issues"
   },
   "type": "module",
   "main": "lib/index.js",

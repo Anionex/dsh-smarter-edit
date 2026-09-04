@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-export declare const name = "@anionex/dsh-apply-patch";
+export declare const name = "@anionex/dsh-smarter-edit";
 export declare const inject: string[];
 export interface Config {
     /** Remove native file-mutation schemas and guidance while this plugin is active. */

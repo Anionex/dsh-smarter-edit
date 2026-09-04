@@ -6,7 +6,7 @@ import test from 'node:test'
 import { applyPatchAtomic } from '../lib/engine.js'
 
 async function workspace(t) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-apply-patch-'))
+  const root = await mkdtemp(join(tmpdir(), 'dsh-smarter-edit-'))
   t.after(async () => {
     const { rm } = await import('node:fs/promises')
     await rm(root, { recursive: true, force: true })

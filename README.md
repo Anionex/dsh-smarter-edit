@@ -1,18 +1,18 @@
-# DSH Apply Patch
+# DSH Smarter Edit
 
 [中文说明](README.zh.md)
 
-[![npm version](https://img.shields.io/npm/v/@anionex/dsh-apply-patch?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-apply-patch)
-[![License](https://img.shields.io/github/license/Anionex/dsh-apply-patch?style=flat-square)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/dsh-apply-patch/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/dsh-apply-patch/actions/workflows/ci.yml)
-[![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-apply-patch?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-apply-patch)
-[![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-apply-patch?style=flat-square&label=release)](https://github.com/Anionex/dsh-apply-patch/releases)
+[![npm version](https://img.shields.io/npm/v/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
+[![License](https://img.shields.io/github/license/Anionex/dsh-smarter-edit?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Anionex/dsh-smarter-edit/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Anionex/dsh-smarter-edit/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/npm/types/@anionex/dsh-smarter-edit?style=flat-square)](https://www.npmjs.com/package/@anionex/dsh-smarter-edit)
+[![GitHub release](https://img.shields.io/github/v/release/Anionex/dsh-smarter-edit?style=flat-square&label=release)](https://github.com/Anionex/dsh-smarter-edit/releases)
 
 **One ordered, atomic, reviewable `apply_patch` call for multi-file edits in DeepSeek Harness.**
 
-DSH Apply Patch replaces the model-visible native `edit` and `write` tools, plus legacy `str_replace_editor`, with a Codex-compatible `apply_patch` tool. Models can add, update, move, and delete files across ordered hunks. The plugin preflights the whole patch, rolls back handled failures, and renders the result with DSH's native diff UI.
+DSH Smarter Edit replaces the model-visible native `edit` and `write` tools, plus legacy `str_replace_editor`, with a Codex-compatible `apply_patch` tool. Models can add, update, move, and delete files across ordered hunks. The plugin preflights the whole patch, rolls back handled failures, and renders the result with DSH's native diff UI.
 
-![DSH Apply Patch: one ordered, atomic apply_patch call for multi-file edits](assets/hero.png)
+![DSH Smarter Edit: one ordered, atomic apply_patch call for multi-file edits](assets/hero.png)
 
 ## Features
 
@@ -28,7 +28,7 @@ DSH Apply Patch replaces the model-visible native `edit` and `write` tools, plus
 Install the current npm release into a Desktop Profile:
 
 ```sh
-dsh plugin --profile desktop add @anionex/dsh-apply-patch
+dsh plugin --profile desktop add @anionex/dsh-smarter-edit
 ```
 
 Use `web` or `headless` instead of `desktop` for those Profiles. Restart the running Profile and create a new Session after installation.
@@ -80,7 +80,7 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
 4. The tool returns an operation summary, a canonical unified diff, and per-hunk presentation metadata.
 5. DSH stores the raw patch in Session history. The Web client uses the presentation metadata to replay the native diff card.
 
-The pure engine is exported from `@anionex/dsh-apply-patch/engine` and has no Cordis dependency. The DSH adapter stays in `src/host.ts` and `src/index.ts`.
+The pure engine is exported from `@anionex/dsh-smarter-edit/engine` and has no Cordis dependency. The DSH adapter stays in `src/host.ts` and `src/index.ts`.
 
 ## Guarantees
 
@@ -194,7 +194,7 @@ Reject a trial from the freeform cohort if the recorded provider request describ
 
 - Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 - Get usage help through [SUPPORT.md](SUPPORT.md).
-- Propose changes through [CONTRIBUTING.md](CONTRIBUTING.md) and the [issue tracker](https://github.com/Anionex/dsh-apply-patch/issues).
+- Propose changes through [CONTRIBUTING.md](CONTRIBUTING.md) and the [issue tracker](https://github.com/Anionex/dsh-smarter-edit/issues).
 - Read release history in [CHANGELOG.md](CHANGELOG.md).
 - Community participation follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 

@@ -7,7 +7,7 @@ const compiledPath = join(root, '.client-build', 'index.js')
 const outputPath = join(root, 'lib', 'client.js')
 const source = await readFile(compiledPath, 'utf8')
 const wrapped = [
-  'window.__ModuleLoader__.load({ id: "@anionex/dsh-apply-patch", factory: (require) => {',
+  'window.__ModuleLoader__.load({ id: "@anionex/dsh-smarter-edit", factory: (require) => {',
   'var module = { exports: {} }; var exports = module.exports;',
   source,
   'return module.exports; } });',

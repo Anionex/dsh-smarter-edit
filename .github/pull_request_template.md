@@ -1,4 +1,4 @@
-<!-- Thank you for contributing to DSH Apply Patch. -->
+<!-- Thank you for contributing to DSH Smarter Edit. -->
 
 ## What and why
 

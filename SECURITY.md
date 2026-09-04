@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are released for the latest npm version of
-`@anionex/dsh-apply-patch`. Older releases are handled on a best-effort basis.
+`@anionex/dsh-smarter-edit`. Older releases are handled on a best-effort basis.
 
 ## Reporting a vulnerability
 

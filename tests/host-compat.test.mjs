@@ -7,7 +7,7 @@ import test from 'node:test'
 import { runApplyPatch } from '../lib/host.js'
 
 async function workspace(t) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-apply-patch-host-'))
+  const root = await mkdtemp(join(tmpdir(), 'dsh-smarter-edit-host-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   return root
 }
@@ -87,7 +87,7 @@ test('uses DSH workspace-write roots, including the platform temp directory', as
   await runApplyPatch(context(root, 'workspace-write'), patch, execution(root))
   assert.equal(await readFile(destination, 'utf8'), 'outside\n')
 
-  const denied = `/opt/dsh-apply-patch-${randomUUID()}.txt`
+  const denied = `/opt/dsh-smarter-edit-${randomUUID()}.txt`
   await assert.rejects(
     runApplyPatch(
       context(root, 'workspace-write'),
@@ -99,7 +99,7 @@ test('uses DSH workspace-write roots, including the platform temp directory', as
 })
 
 test('rechecks DSH path identity before staging and commit', async t => {
-  const base = await mkdtemp(join(homedir(), '.dsh-apply-patch-race-'))
+  const base = await mkdtemp(join(homedir(), '.dsh-smarter-edit-race-'))
   t.after(() => rm(base, { recursive: true, force: true }))
   const root = join(base, 'workspace')
   const outside = join(base, 'outside')

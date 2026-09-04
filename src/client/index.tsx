@@ -18,30 +18,30 @@ type ApplyPatchRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 type RowState = 'running' | 'ok' | 'error' | 'stopped'
 
 const CSS = `
-.dsh-apply-patch-row{display:flex;flex-direction:column;width:100%;min-width:0}
-.dsh-apply-patch-row__header{overflow:hidden}
-.dsh-apply-patch-row__title{font-weight:400}
-.dsh-apply-patch-row__sep{flex:none;width:2px;height:2px;border-radius:1px;margin:0 8px;background:var(--dsw-alias-label-caption)}
-.dsh-apply-patch-row__summary{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(24px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-tertiary)}
-button.dsh-apply-patch-row__summary{text-align:left;padding:0;border:0;background:none;font:inherit;font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(24px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-secondary);text-decoration:underline dotted;text-decoration-color:var(--dsw-alias-label-tertiary);text-underline-offset:3px;cursor:pointer}
-button.dsh-apply-patch-row__summary:hover{color:var(--dsw-alias-label-primary);text-decoration-color:currentColor}
-.dsh-apply-patch-row__stat{flex:none;margin-left:10px;white-space:nowrap;font-family:var(--ds-font-family-code);font-size:calc(var(--dsh-content-font-size-secondary,13px) - 2px);color:var(--dsw-alias-label-caption)}
-.dsh-apply-patch-row__body{display:flex;flex-direction:column}
-.dsh-apply-patch-row__diff{margin:4px 0 4px 4px}
-.dsh-apply-patch-row__output{margin:4px 0 4px 4px;padding:10px 12px;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-markdown-code-block);border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;font:var(--dsw-font-markdown-code-block-small)}
-.dsh-apply-patch-row__output[data-error=true]{color:var(--dsw-alias-state-error-primary)}
-.dsh-apply-patch-row__inspect{display:inline-flex;align-self:flex-start;align-items:center;gap:4px;margin:4px 0 2px 4px;padding:2px 8px;border:.5px solid var(--dsw-alias-border-l3);border-radius:999px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;cursor:pointer;opacity:0;transition:opacity 100ms ease}
-.dsh-apply-patch-row:hover .dsh-apply-patch-row__inspect,.dsh-apply-patch-row__inspect:focus-visible{opacity:1}
-.dsh-apply-patch-row__inspect:hover{background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary)}
-.dsh-apply-patch-row__sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.dsh-smarter-edit-row{display:flex;flex-direction:column;width:100%;min-width:0}
+.dsh-smarter-edit-row__header{overflow:hidden}
+.dsh-smarter-edit-row__title{font-weight:400}
+.dsh-smarter-edit-row__sep{flex:none;width:2px;height:2px;border-radius:1px;margin:0 8px;background:var(--dsw-alias-label-caption)}
+.dsh-smarter-edit-row__summary{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(24px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-tertiary)}
+button.dsh-smarter-edit-row__summary{text-align:left;padding:0;border:0;background:none;font:inherit;font-size:var(--dsh-content-font-size-secondary,13px);line-height:calc(24px + var(--dsh-content-font-delta,0px));color:var(--dsw-alias-label-secondary);text-decoration:underline dotted;text-decoration-color:var(--dsw-alias-label-tertiary);text-underline-offset:3px;cursor:pointer}
+button.dsh-smarter-edit-row__summary:hover{color:var(--dsw-alias-label-primary);text-decoration-color:currentColor}
+.dsh-smarter-edit-row__stat{flex:none;margin-left:10px;white-space:nowrap;font-family:var(--ds-font-family-code);font-size:calc(var(--dsh-content-font-size-secondary,13px) - 2px);color:var(--dsw-alias-label-caption)}
+.dsh-smarter-edit-row__body{display:flex;flex-direction:column}
+.dsh-smarter-edit-row__diff{margin:4px 0 4px 4px}
+.dsh-smarter-edit-row__output{margin:4px 0 4px 4px;padding:10px 12px;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-markdown-code-block);border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;font:var(--dsw-font-markdown-code-block-small)}
+.dsh-smarter-edit-row__output[data-error=true]{color:var(--dsw-alias-state-error-primary)}
+.dsh-smarter-edit-row__inspect{display:inline-flex;align-self:flex-start;align-items:center;gap:4px;margin:4px 0 2px 4px;padding:2px 8px;border:.5px solid var(--dsw-alias-border-l3);border-radius:999px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;cursor:pointer;opacity:0;transition:opacity 100ms ease}
+.dsh-smarter-edit-row:hover .dsh-smarter-edit-row__inspect,.dsh-smarter-edit-row__inspect:focus-visible{opacity:1}
+.dsh-smarter-edit-row__inspect:hover{background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary)}
+.dsh-smarter-edit-row__sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 `
 
 function installStyles(): () => void {
-  const id = '@anionex/dsh-apply-patch/client'
+  const id = '@anionex/dsh-smarter-edit/client'
   const existing = document.querySelector<HTMLStyleElement>(`style[data-plugin-css="${id}"]`)
   if (existing !== null) return () => {}
   const style = document.createElement('style')
-  style.dataset.plugin = '@anionex/dsh-apply-patch'
+  style.dataset.plugin = '@anionex/dsh-smarter-edit'
   style.dataset.pluginCss = id
   style.textContent = CSS
   document.head.appendChild(style)
@@ -160,8 +160,8 @@ export function ApplyPatchRow({
   }
 
   return (
-    <div className="dsh-apply-patch-row" data-tool="apply_patch" data-state={state}>
-      {status !== null && <span className="dsh-apply-patch-row__sr">{status}</span>}
+    <div className="dsh-smarter-edit-row" data-tool="apply_patch" data-state={state}>
+      {status !== null && <span className="dsh-smarter-edit-row__sr">{status}</span>}
       <DisclosureRow
         icon={stateLeading(state)}
         title="Apply patch"
@@ -170,34 +170,34 @@ export function ApplyPatchRow({
         expandOnRowClick
         keepContentWhenOpen
         onToggle={() => { setExpanded(value => !value) }}
-        rowClassName="dsh-apply-patch-row__header"
-        titleClassName="dsh-apply-patch-row__title"
+        rowClassName="dsh-smarter-edit-row__header"
+        titleClassName="dsh-smarter-edit-row__title"
         collapsedContent={(
           <>
-            <span className="dsh-apply-patch-row__sep" aria-hidden />
+            <span className="dsh-smarter-edit-row__sep" aria-hidden />
             {paths.length === 1 && state !== 'error' ? (
-              <button type="button" className="dsh-apply-patch-row__summary" onClick={openOnlyPath}>
+              <button type="button" className="dsh-smarter-edit-row__summary" onClick={openOnlyPath}>
                 {summary}
               </button>
             ) : (
-              <span className="dsh-apply-patch-row__summary">{summary}</span>
+              <span className="dsh-smarter-edit-row__summary">{summary}</span>
             )}
             {totals !== null && (
-              <span className="dsh-apply-patch-row__stat">+{totals.added} -{totals.removed}</span>
+              <span className="dsh-smarter-edit-row__stat">+{totals.added} -{totals.removed}</span>
             )}
           </>
         )}
       >
-        <div className="dsh-apply-patch-row__body">
+        <div className="dsh-smarter-edit-row__body">
           {diffs !== null
-            ? <DiffBlock diffs={diffs} labels={labels} maxLines={8} className="dsh-apply-patch-row__diff" />
+            ? <DiffBlock diffs={diffs} labels={labels} maxLines={8} className="dsh-smarter-edit-row__diff" />
             : output !== null && (
-              <div className="dsh-apply-patch-row__output" data-error={state === 'error'}>
+              <div className="dsh-smarter-edit-row__output" data-error={state === 'error'}>
                 {output}
               </div>
             )}
           {inspect !== undefined && (
-            <button type="button" className="dsh-apply-patch-row__inspect" onClick={inspect}>
+            <button type="button" className="dsh-smarter-edit-row__inspect" onClick={inspect}>
               <IconInspectOutline12 />
               {t('row.inspect')}
             </button>
@@ -211,7 +211,7 @@ export function ApplyPatchRow({
 export const inject = ['slots']
 
 export function apply(ctx: Context): void {
-  ctx.effect(installStyles, 'dsh-apply-patch: styles')
+  ctx.effect(installStyles, 'dsh-smarter-edit: styles')
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
     name: 'tool.call.toolview',
     key: 'apply_patch',

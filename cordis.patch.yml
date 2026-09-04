@@ -1,4 +1,4 @@
 # Mount the Codex-style freeform apply_patch tool into a DSH profile.
 - insert:
     - id: tool-apply-patch
-      name: '@anionex/dsh-apply-patch'
+      name: '@anionex/dsh-smarter-edit'

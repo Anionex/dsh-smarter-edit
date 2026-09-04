@@ -59,7 +59,7 @@ test('runs the official Codex scenario corpus with one documented atomicity over
   for (const scenario of scenarios) {
     await t.test(scenario.name, async () => {
       const fixture = join(scenariosRoot.pathname, scenario.name)
-      const workspace = await mkdtemp(join(tmpdir(), 'dsh-apply-patch-codex-'))
+      const workspace = await mkdtemp(join(tmpdir(), 'dsh-smarter-edit-codex-'))
       try {
         const input = join(fixture, 'input')
         if ((await stat(input).catch(() => undefined))?.isDirectory()) await copyTree(input, workspace)
