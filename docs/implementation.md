@@ -61,11 +61,18 @@ On pi-ai OpenAI Responses routes, the provider request contains an OpenAI
 `type: "custom"` tool with raw input. Other provider protocols retain their
 ordinary JSON tool transport.
 
-DSH's public `llm/stream` middleware removes pi-ai's temporary single-property
-envelope before DSH assembles, executes, or persists a completed call. A replay
-bridge restores that envelope only inside the adapter when a later model step
-replays raw Session history. Live arguments, Session logs, and the Trajectory
-parameter view therefore contain raw patch text.
+Some OpenAI-compatible completion routes return that input through a temporary
+single-property fallback envelope. The bridge accepts pi-ai's `patch` and
+`input` properties. It also accepts DeepSeek V4 Flash's `arguments` property
+only when the value starts with `*** Begin Patch` after leading whitespace.
+Other values and envelopes with multiple members, including duplicate names,
+remain rejected.
+
+DSH's public `llm/stream` middleware removes these temporary envelopes before
+DSH assembles, executes, or persists a completed call. A replay bridge restores
+pi-ai's envelope only inside the adapter when a later model step replays raw
+Session history. Live arguments, Session logs, and the Trajectory parameter view
+therefore contain raw patch text.
 
 ## Package entry points and presentation
 

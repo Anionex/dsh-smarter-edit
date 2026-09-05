@@ -17,7 +17,7 @@ interface SnapshotLike {
     models: ModelsLike;
     [key: string]: unknown;
 }
-/** Recover one raw custom-tool input from pi-ai's required JSON execution envelope. */
+/** Recover raw custom-tool input from pi-ai and provider fallback envelopes. */
 export declare function unwrapApplyPatchArguments(serialized: string): string;
 /** Restore raw durable calls to pi-ai's internal grammar-tool envelope for replay. */
 export declare function rewrapApplyPatchHistory(options: unknown): unknown;

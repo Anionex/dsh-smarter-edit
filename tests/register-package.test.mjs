@@ -127,7 +127,7 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-smarter-edit')
-  assert.equal(pkg.version, '0.1.5')
+  assert.equal(pkg.version, '0.1.6')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')

@@ -6,6 +6,25 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-09-05
+
+### Fixed
+
+- Accept DeepSeek V4 Flash's singleton `arguments` fallback only when its value
+  is raw patch text, preventing the bridge from terminating otherwise valid
+  `apply_patch` calls while continuing to reject arbitrary or multi-field
+  envelopes.
+- Include recognized JSON field names and value types in bridge compatibility
+  errors while redacting unknown field names and all values.
+
+### Documentation
+
+- Reworked the English and Chinese READMEs around exact-string replacement and
+  JSON-format overhead, and moved transport and atomicity details into paired
+  implementation documents.
+- Clarified that rollback protects file state but does not bound the retry cost
+  of a failed large patch.
+
 ## [0.1.5] - 2026-09-04
 
 ### Changed
@@ -64,7 +83,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.6
 [0.1.5]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.5
 [0.1.4]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.4
 [0.1.3]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.3

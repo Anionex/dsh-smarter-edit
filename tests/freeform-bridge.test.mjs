@@ -139,6 +139,13 @@ test('restores raw patch deltas and final arguments without touching other chunk
   assert.equal(chunks[3].block.arguments, patch)
   assert.equal(unwrapApplyPatchArguments(patch), patch)
   assert.equal(unwrapApplyPatchArguments(JSON.stringify({ input: patch })), patch)
+  assert.equal(unwrapApplyPatchArguments(JSON.stringify({ arguments: patch })), patch)
+  assert.equal(unwrapApplyPatchArguments(JSON.stringify({ arguments: `  ${patch}` })), `  ${patch}`)
+  const punctuationPatch = '*** Begin Patch\n*** Add File: punctuation.txt\n+comma, quote " and slash \\\n*** End Patch'
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({ arguments: punctuationPatch })),
+    punctuationPatch,
+  )
   assert.throws(
     () => unwrapApplyPatchArguments(JSON.stringify({ patch, extra: true })),
     /expected raw custom-tool input/u,
@@ -147,11 +154,67 @@ test('restores raw patch deltas and final arguments without touching other chunk
     () => unwrapApplyPatchArguments(JSON.stringify({ input: patch, extra: true })),
     /expected raw custom-tool input/u,
   )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({ arguments: patch, extra: true })),
+    /expected raw custom-tool input/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({ patch: { text: patch } })),
+    /JSON object with 1 field\(s\) \("patch":object\)/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({ arguments: 'not a patch' })),
+    /expected raw custom-tool input/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({ '*** Begin Patch\nsecret': patch })),
+    error => error.message.includes('"<unknown>":string') && !error.message.includes('secret'),
+  )
+  for (const key of ['patch', 'input', 'arguments']) {
+    assert.throws(
+      () => unwrapApplyPatchArguments(
+        `{${JSON.stringify(key)}:"ignored",${JSON.stringify(key)}:${JSON.stringify(patch)}}`,
+      ),
+      /expected raw custom-tool input/u,
+    )
+  }
 })
 
 test('restores raw patch input from pi-ai fallback envelopes', async () => {
   const patch = '*** Begin Patch\n*** Add File: fallback.txt\n+fallback\n*** End Patch'
   const envelope = JSON.stringify({ input: patch })
+  async function* source() {
+    for (const [index, character] of [...envelope].entries()) {
+      yield {
+        type: 'tool-call-delta',
+        index: 1,
+        ...(index === 0 ? { name: 'apply_patch' } : {}),
+        argumentsDelta: character,
+      }
+    }
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: 'call-1',
+        name: 'apply_patch',
+        arguments: envelope,
+      },
+    }
+  }
+
+  const chunks = []
+  for await (const chunk of unwrapApplyPatchStream(source())) chunks.push(chunk)
+  assert.equal(chunks
+    .filter(chunk => chunk.type === 'tool-call-delta')
+    .map(chunk => chunk.argumentsDelta).join(''), patch)
+  assert.equal(chunks.at(-1).block.arguments, patch)
+})
+
+test('restores DeepSeek raw patch input from its function-argument fallback', async () => {
+  const patch = '  *** Begin Patch\n*** Add File: deepseek.txt\n+deepseek\n*** End Patch'
+  const envelope = JSON.stringify({ arguments: patch })
   async function* source() {
     for (const [index, character] of [...envelope].entries()) {
       yield {

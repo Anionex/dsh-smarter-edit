@@ -1,6 +1,6 @@
 {
   "name": "@anionex/dsh-smarter-edit",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A better approach to editing files in DSH.",
   "homepage": "https://github.com/Anionex/dsh-smarter-edit#readme",
   "publishConfig": {

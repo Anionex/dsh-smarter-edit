@@ -74,7 +74,45 @@ interface PatchDeltaState {
   closed: boolean
 }
 
-/** Recover one raw custom-tool input from pi-ai's required JSON execution envelope. */
+const KNOWN_PATCH_ARGUMENT_NAMES = new Set(['patch', 'input', 'arguments'])
+
+function describePatchArguments(serialized: string): string {
+  try {
+    const parsed = JSON.parse(serialized) as unknown
+    if (Array.isArray(parsed)) return `JSON array with ${parsed.length} item(s)`
+    if (typeof parsed !== 'object' || parsed === null) return `JSON ${parsed === null ? 'null' : typeof parsed}`
+    const entries = Object.entries(parsed)
+    const fields = entries.slice(0, 4).map(([key, value]) => {
+      const valueType = Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value
+      const displayedKey = KNOWN_PATCH_ARGUMENT_NAMES.has(key) ? JSON.stringify(key) : '"<unknown>"'
+      return `${displayedKey}:${valueType}`
+    })
+    return `JSON object with ${entries.length} field(s)${fields.length > 0 ? ` (${fields.join(', ')})` : ''}`
+  } catch {
+    return `non-JSON text (${serialized.length} chars)`
+  }
+}
+
+function hasSingleTopLevelJsonMember(serialized: string): boolean {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (const character of serialized) {
+    if (inString) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === '"') inString = false
+      continue
+    }
+    if (character === '"') inString = true
+    else if (character === '{' || character === '[') depth += 1
+    else if (character === '}' || character === ']') depth -= 1
+    else if (character === ',' && depth === 1) return false
+  }
+  return true
+}
+
+/** Recover raw custom-tool input from pi-ai and provider fallback envelopes. */
 export function unwrapApplyPatchArguments(serialized: string): string {
   if (serialized.startsWith('*** Begin Patch')) return serialized
   try {
@@ -84,8 +122,13 @@ export function unwrapApplyPatchArguments(serialized: string): string {
       if (
         entry !== undefined
         && Object.keys(parsed).length === 1
-        && (entry[0] === 'patch' || entry[0] === 'input')
+        && hasSingleTopLevelJsonMember(serialized)
         && typeof entry[1] === 'string'
+        && (
+          entry[0] === 'patch'
+          || entry[0] === 'input'
+          || (entry[0] === 'arguments' && entry[1].trimStart().startsWith('*** Begin Patch'))
+        )
       ) {
         return entry[1]
       }
@@ -94,7 +137,7 @@ export function unwrapApplyPatchArguments(serialized: string): string {
     // Fall through to the version-mismatch error below.
   }
   throw new PatchError(
-    'dsh-smarter-edit: pi-ai did not return the expected raw custom-tool input',
+    `dsh-smarter-edit: pi-ai did not return the expected raw custom-tool input; received ${describePatchArguments(serialized)}`,
     'PATCH_UNSUPPORTED',
   )
 }
