@@ -6,6 +6,22 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-09-08
+
+### Fixed
+
+- Normalize DeepSeek V4.1 Flash's nested JSON-encoded `arguments` fallback
+  before restoring raw patch text.
+- Accept multiple known fallback fields only when every field independently
+  restores the same patch bytes, while continuing to reject duplicate names,
+  unknown fields, non-string values, and conflicting payloads.
+- Reject mismatched streamed and final patch arguments, and reject a stream
+  that ends with an incomplete patch tool call.
+- Assert that both OpenAI Responses and grammar-capable OpenAI Chat Completions
+  requests expose `apply_patch` as a custom grammar tool rather than a function.
+- Classify recognized string wrappers in compatibility errors without exposing
+  their contents.
+
 ## [0.1.6] - 2026-09-05
 
 ### Fixed
@@ -83,7 +99,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.7
 [0.1.6]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.6
 [0.1.5]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.5
 [0.1.4]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.4

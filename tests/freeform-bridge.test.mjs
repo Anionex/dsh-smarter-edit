@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import { stream as streamOpenAICompletions } from '@earendil-works/pi-ai/api/openai-completions'
 import { stream as streamOpenAIResponses } from '@earendil-works/pi-ai/api/openai-responses'
 import {
   bridgeSnapshot,
@@ -101,6 +102,47 @@ test('pi-ai serializes the enriched schema as an OpenAI custom tool on the wire'
   assert.equal('parameters' in payload.tools[0], false)
 })
 
+test('pi-ai serializes the enriched schema as a Chat Completions custom tool', async () => {
+  let payload
+  const grammar = 'start: "*** Begin Patch" LF "*** End Patch" LF?\n%import common.LF\n'
+  const context = withApplyPatchGrammar({ messages: [], tools: [patchTool] }, grammar)
+  const model = {
+    id: 'deepseek-test',
+    name: 'deepseek-test',
+    api: 'openai-completions',
+    provider: 'deepseek',
+    baseUrl: 'https://example.invalid/v1',
+    reasoning: false,
+    input: ['text'],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 10_000,
+    maxTokens: 1_000,
+    compat: { supportsOpenAIGrammarTools: true },
+  }
+  const events = streamOpenAICompletions(model, context, {
+    apiKey: 'test-key',
+    onPayload(value) {
+      payload = value
+      throw new Error('payload captured before network')
+    },
+  })
+  for await (const _event of events) {
+    // Drain the expected adapter error after onPayload captures the request.
+  }
+  assert.deepEqual(payload.tools, [{
+    type: 'custom',
+    custom: {
+      name: 'apply_patch',
+      description: 'patch',
+      format: {
+        type: 'grammar',
+        grammar: { syntax: 'lark', definition: grammar },
+      },
+    },
+  }])
+  assert.equal('function' in payload.tools[0], false)
+})
+
 test('restores raw patch deltas and final arguments without touching other chunks', async () => {
   const patch = '*** Begin Patch\n*** Add File: src/a.ts\n+const value = "x\\\\y"\n*** End Patch\n'
   const cut = patch.indexOf('+const')
@@ -138,8 +180,18 @@ test('restores raw patch deltas and final arguments without touching other chunk
   assert.equal(chunks[1].argumentsDelta + chunks[2].argumentsDelta, patch)
   assert.equal(chunks[3].block.arguments, patch)
   assert.equal(unwrapApplyPatchArguments(patch), patch)
-  assert.equal(unwrapApplyPatchArguments(JSON.stringify({ input: patch })), patch)
-  assert.equal(unwrapApplyPatchArguments(JSON.stringify({ arguments: patch })), patch)
+  assert.equal(unwrapApplyPatchArguments(`  ${patch}`), `  ${patch}`)
+  for (const outer of ['patch', 'input', 'arguments']) {
+    assert.equal(unwrapApplyPatchArguments(JSON.stringify({ [outer]: patch })), patch)
+    for (const inner of ['patch', 'input', 'arguments']) {
+      assert.equal(
+        unwrapApplyPatchArguments(JSON.stringify({
+          [outer]: JSON.stringify({ [inner]: patch }),
+        })),
+        patch,
+      )
+    }
+  }
   assert.equal(unwrapApplyPatchArguments(JSON.stringify({ arguments: `  ${patch}` })), `  ${patch}`)
   const punctuationPatch = '*** Begin Patch\n*** Add File: punctuation.txt\n+comma, quote " and slash \\\n*** End Patch'
   assert.equal(
@@ -162,8 +214,83 @@ test('restores raw patch deltas and final arguments without touching other chunk
     () => unwrapApplyPatchArguments(JSON.stringify({ patch: { text: patch } })),
     /JSON object with 1 field\(s\) \("patch":object\)/u,
   )
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ patch }),
+    })),
+    patch,
+  )
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ input: patch }),
+    })),
+    patch,
+  )
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ arguments: JSON.stringify({ patch }) }),
+    })),
+    patch,
+  )
+  let deeplyNested = patch
+  for (let index = 0; index < 5; index += 1) {
+    deeplyNested = JSON.stringify({ arguments: deeplyNested })
+  }
+  assert.equal(unwrapApplyPatchArguments(deeplyNested), patch)
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({ arguments: patch, patch })),
+    patch,
+  )
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ patch }),
+      patch,
+    })),
+    patch,
+  )
+  assert.equal(
+    unwrapApplyPatchArguments(JSON.stringify({
+      arguments: patch,
+      patch: JSON.stringify({ input: patch }),
+      input: JSON.stringify({ arguments: patch }),
+    })),
+    patch,
+  )
   assert.throws(
-    () => unwrapApplyPatchArguments(JSON.stringify({ arguments: 'not a patch' })),
+    () => unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ patch }),
+      patch: `${patch}\n`,
+    })),
+    /expected raw custom-tool input/u,
+  )
+  for (const key of ['patch', 'input', 'arguments']) {
+    assert.throws(
+      () => unwrapApplyPatchArguments(JSON.stringify({
+        [key]: `tool input:\n${patch}`,
+      })),
+      /string\(patch marker at offset 12\)/u,
+    )
+    assert.throws(
+      () => unwrapApplyPatchArguments(JSON.stringify({ [key]: 'not a patch' })),
+      /expected raw custom-tool input/u,
+    )
+  }
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({
+      arguments: JSON.stringify({ payload: patch }),
+    })),
+    /expected raw custom-tool input/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({
+      arguments: `{"patch":"ignored","patch":${JSON.stringify(patch)}}`,
+    })),
+    /expected raw custom-tool input/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments(JSON.stringify({
+      arguments: '{"patch":',
+    })),
     /expected raw custom-tool input/u,
   )
   assert.throws(
@@ -178,6 +305,16 @@ test('restores raw patch deltas and final arguments without touching other chunk
       /expected raw custom-tool input/u,
     )
   }
+  assert.throws(
+    () => unwrapApplyPatchArguments(
+      `{"p\\u0061tch":"ignored","patch":${JSON.stringify(patch)}}`,
+    ),
+    /expected raw custom-tool input/u,
+  )
+  assert.throws(
+    () => unwrapApplyPatchArguments('{"patch":'),
+    /expected raw custom-tool input/u,
+  )
 })
 
 test('restores raw patch input from pi-ai fallback envelopes', async () => {
@@ -242,6 +379,117 @@ test('restores DeepSeek raw patch input from its function-argument fallback', as
     .filter(chunk => chunk.type === 'tool-call-delta')
     .map(chunk => chunk.argumentsDelta).join(''), patch)
   assert.equal(chunks.at(-1).block.arguments, patch)
+})
+
+test('restores nested and agreeing DeepSeek patch argument fallbacks', async () => {
+  const patch = '*** Begin Patch\n*** Add File: deepseek-nested.txt\n+deepseek\n*** End Patch'
+  for (const envelope of [
+    JSON.stringify({ arguments: JSON.stringify({ patch }) }),
+    JSON.stringify({ arguments: patch, patch }),
+    JSON.stringify({ arguments: JSON.stringify({ patch }), patch }),
+  ]) {
+    async function* source() {
+      for (const [index, character] of [...envelope].entries()) {
+        yield {
+          type: 'tool-call-delta',
+          index: 1,
+          ...(index === 0 ? { name: 'apply_patch' } : {}),
+          argumentsDelta: character,
+        }
+      }
+      yield {
+        type: 'block-end',
+        index: 1,
+        block: {
+          type: 'tool-call',
+          id: 'call-1',
+          name: 'apply_patch',
+          arguments: envelope,
+        },
+      }
+    }
+
+    const chunks = []
+    for await (const chunk of unwrapApplyPatchStream(source())) chunks.push(chunk)
+    assert.equal(chunks
+      .filter(chunk => chunk.type === 'tool-call-delta')
+      .map(chunk => chunk.argumentsDelta).join(''), patch)
+    assert.equal(chunks.at(-1).block.arguments, patch)
+  }
+})
+
+test('rejects mismatched, invalid, and truncated streamed patch arguments', async () => {
+  const patchA = '*** Begin Patch\n*** Add File: a.txt\n+a\n*** End Patch'
+  const patchB = '*** Begin Patch\n*** Add File: b.txt\n+b\n*** End Patch'
+  const deltaEnvelope = JSON.stringify({ arguments: JSON.stringify({ patch: patchA }) })
+  const finalEnvelope = JSON.stringify({ patch: patchB })
+  const deltaChunk = {
+    type: 'tool-call-delta',
+    index: 1,
+    name: 'apply_patch',
+    argumentsDelta: deltaEnvelope,
+  }
+  const finalChunk = {
+    type: 'block-end',
+    index: 1,
+    block: {
+      type: 'tool-call',
+      id: 'call-1',
+      name: 'apply_patch',
+      arguments: finalEnvelope,
+    },
+  }
+  async function* mismatched() {
+    yield deltaChunk
+    yield finalChunk
+  }
+  await assert.rejects(async () => {
+    for await (const _chunk of unwrapApplyPatchStream(mismatched())) {
+      // Drain until the final mismatch is detected.
+    }
+  }, /different streamed and final patch input/u)
+  assert.equal(deltaChunk.argumentsDelta, deltaEnvelope)
+  assert.equal(finalChunk.block.arguments, finalEnvelope)
+
+  async function* invalidThenFinal() {
+    yield {
+      type: 'tool-call-delta',
+      index: 1,
+      name: 'apply_patch',
+      argumentsDelta: '{"arguments":false}',
+    }
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: 'call-2',
+        name: 'apply_patch',
+        arguments: JSON.stringify({ patch: patchA }),
+      },
+    }
+  }
+  await assert.rejects(async () => {
+    for await (const _chunk of unwrapApplyPatchStream(invalidThenFinal())) {
+      // Drain until the invalid streamed input is detected.
+    }
+  }, /expected raw custom-tool input/u)
+
+  for (const argumentsDelta of ['{"arguments":false}', patchA]) {
+    async function* truncated() {
+      yield {
+        type: 'tool-call-delta',
+        index: 1,
+        name: 'apply_patch',
+        argumentsDelta,
+      }
+    }
+    await assert.rejects(async () => {
+      for await (const _chunk of unwrapApplyPatchStream(truncated())) {
+        // Drain until the missing final block is detected.
+      }
+    }, /incomplete patch tool call/u)
+  }
 })
 
 test('rewraps only raw historical apply_patch calls for pi-ai replay', () => {

@@ -58,15 +58,23 @@ and enriches only the exact `apply_patch` schema with the bundled OpenAI Lark
 grammar.
 
 On pi-ai OpenAI Responses routes, the provider request contains an OpenAI
-`type: "custom"` tool with raw input. Other provider protocols retain their
+`type: "custom"` tool with raw input. Grammar-capable OpenAI Chat Completions
+routes also receive `type: "custom"`, with `custom.format` carrying the Lark
+grammar; they do not receive a JSON Schema function definition for
+`apply_patch`. Provider protocols without custom grammar tools retain their
 ordinary JSON tool transport.
 
-Some OpenAI-compatible completion routes return that input through a temporary
-single-property fallback envelope. The bridge accepts pi-ai's `patch` and
-`input` properties. It also accepts DeepSeek V4 Flash's `arguments` property
-only when the value starts with `*** Begin Patch` after leading whitespace.
-Other values and envelopes with multiple members, including duplicate names,
-remain rejected.
+Some OpenAI-compatible completion routes return that input through temporary
+JSON fallback envelopes. The bridge accepts pi-ai's `patch` and `input`
+properties. DeepSeek V4 routes can intermittently answer the custom request
+through a function-shaped `arguments` fallback, whose string value can itself
+contain a JSON-encoded known fallback envelope; the bridge unwraps those layers
+only when they restore raw patch text. An envelope with multiple known
+properties is accepted only when every property independently restores the
+same patch bytes. Duplicate names, unknown properties, non-string values,
+conflicting payloads, and arbitrary prefixed text remain rejected.
+The normalized streamed input must also match the completed ToolCallBlock
+exactly; a mismatch or a stream that ends without that final block is rejected.
 
 DSH's public `llm/stream` middleware removes these temporary envelopes before
 DSH assembles, executes, or persists a completed call. A replay bridge restores

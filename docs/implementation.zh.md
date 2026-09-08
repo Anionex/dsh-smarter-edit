@@ -49,14 +49,21 @@ DSH `0.1.x` 对外提供用 JSON Schema 描述的工具定义，并在请求进�
 位置加入一层范围受限、支持引用计数的适配，只为完全匹配的 `apply_patch`
 schema 添加随包提供的 OpenAI Lark grammar。
 
-通过 pi-ai 调用 OpenAI Responses 时，发送给 OpenAI 的请求包含
-`type: "custom"` 工具和原始补丁文本。其他模型服务仍使用各自原有的 JSON 工具
-传输方式。
+通过 pi-ai 调用 OpenAI Responses 时，发送给模型服务的请求包含
+`type: "custom"` 工具和原始补丁文本。支持 grammar custom tool 的 OpenAI Chat
+Completions 路由同样接收 `type: "custom"`，Lark grammar 位于
+`custom.format`，不会收到 `apply_patch` 的 JSON Schema function 定义。不支持
+custom grammar tool 的其他模型服务仍使用各自原有的 JSON 工具传输方式。
 
-部分兼容 OpenAI Completions 的模型服务会用临时单字段包装返回这段内容。适配层
-接受 pi-ai 使用的 `patch` 和 `input` 字段。对于 DeepSeek V4 Flash 使用的
-`arguments` 字段，只有去掉前导空白后以 `*** Begin Patch` 开头时才会接受。
-其他字符串，以及含多个成员或重复字段名的对象仍会被拒绝。
+部分兼容 OpenAI Completions 的模型服务会用临时 JSON 包装返回这段内容。适配层
+接受 pi-ai 使用的 `patch` 和 `input` 字段。DeepSeek V4 路由有时会用
+function 形态的 `arguments` 包装回复 custom 请求，其字符串值本身还可能包含
+一层采用已知字段的 JSON 包装；只有最终能够还原出原始补丁文本时，适配层才会
+逐层解包。含多个已知字段的对象，只有每个字段独立还原后得到的补丁字节完全相同
+时才会被接受。重复字段名、未知字段、非字符串值、内容冲突和任意前缀文本仍会
+被拒绝。
+流式参数还原后的内容也必须与最终 ToolCallBlock 完全一致；两者不一致，或者
+流在缺少最终 block 时结束，都会被拒绝。
 
 插件使用 DSH 公开的 `llm/stream` 中间件，在 DSH 组装、执行或保存完整调用前，
 移除这些临时包装。后续模型步骤重放会话历史时，重放适配层只在模型服务适配器

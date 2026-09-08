@@ -70,11 +70,43 @@ interface StreamChunkLike {
 
 interface PatchDeltaState {
   buffer: string
+  emitted: string
   mode: 'unknown' | 'json' | 'raw'
   closed: boolean
 }
 
 const KNOWN_PATCH_ARGUMENT_NAMES = new Set(['patch', 'input', 'arguments'])
+
+function describePatchString(value: string): string {
+  const trimmed = value.trimStart()
+  if (trimmed.startsWith('*** Begin Patch')) return 'string(raw patch)'
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (Array.isArray(parsed)) return `string containing JSON array with ${parsed.length} item(s)`
+    if (typeof parsed !== 'object' || parsed === null) {
+      return `string containing JSON ${parsed === null ? 'null' : typeof parsed}`
+    }
+    const entries = Object.entries(parsed)
+    const fields = entries.slice(0, 4).map(([key, nestedValue]) => {
+      const displayedKey = KNOWN_PATCH_ARGUMENT_NAMES.has(key) ? JSON.stringify(key) : '"<unknown>"'
+      const valueType = typeof nestedValue === 'string'
+        && nestedValue.trimStart().startsWith('*** Begin Patch')
+        ? 'string(raw patch)'
+        : Array.isArray(nestedValue)
+          ? 'array'
+          : nestedValue === null
+            ? 'null'
+            : typeof nestedValue
+      return `${displayedKey}:${valueType}`
+    })
+    return `string containing JSON object with ${entries.length} field(s)${fields.length > 0 ? ` (${fields.join(', ')})` : ''}`
+  } catch {
+    const markerOffset = value.indexOf('*** Begin Patch')
+    return markerOffset >= 0
+      ? `string(patch marker at offset ${markerOffset})`
+      : `string(${value.length} chars)`
+  }
+}
 
 function describePatchArguments(serialized: string): string {
   try {
@@ -83,7 +115,13 @@ function describePatchArguments(serialized: string): string {
     if (typeof parsed !== 'object' || parsed === null) return `JSON ${parsed === null ? 'null' : typeof parsed}`
     const entries = Object.entries(parsed)
     const fields = entries.slice(0, 4).map(([key, value]) => {
-      const valueType = Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value
+      const valueType = typeof value === 'string' && KNOWN_PATCH_ARGUMENT_NAMES.has(key)
+        ? describePatchString(value)
+        : Array.isArray(value)
+          ? 'array'
+          : value === null
+            ? 'null'
+            : typeof value
       const displayedKey = KNOWN_PATCH_ARGUMENT_NAMES.has(key) ? JSON.stringify(key) : '"<unknown>"'
       return `${displayedKey}:${valueType}`
     })
@@ -93,10 +131,11 @@ function describePatchArguments(serialized: string): string {
   }
 }
 
-function hasSingleTopLevelJsonMember(serialized: string): boolean {
+function countTopLevelJsonMembers(serialized: string): number {
   let depth = 0
   let inString = false
   let escaped = false
+  let memberCount = 0
   for (const character of serialized) {
     if (inString) {
       if (escaped) escaped = false
@@ -107,35 +146,54 @@ function hasSingleTopLevelJsonMember(serialized: string): boolean {
     if (character === '"') inString = true
     else if (character === '{' || character === '[') depth += 1
     else if (character === '}' || character === ']') depth -= 1
-    else if (character === ',' && depth === 1) return false
+    else if (character === ':' && depth === 1) memberCount += 1
   }
-  return true
+  return memberCount
+}
+
+function tryUnwrapApplyPatchArguments(serialized: string): string | undefined {
+  if (serialized.trimStart().startsWith('*** Begin Patch')) return serialized
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(serialized) as unknown
+  } catch {
+    return undefined
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined
+  const entries = Object.entries(parsed as Record<string, unknown>)
+  if (
+    entries.length === 0
+    || countTopLevelJsonMembers(serialized) !== entries.length
+    || entries.some(([key, value]) => !KNOWN_PATCH_ARGUMENT_NAMES.has(key) || typeof value !== 'string')
+  ) {
+    return undefined
+  }
+
+  const candidates: string[] = []
+  for (const [, value] of entries as Array<[string, string]>) {
+    if (value.trimStart().startsWith('*** Begin Patch')) {
+      candidates.push(value)
+      continue
+    }
+    const nested = tryUnwrapApplyPatchArguments(value)
+    if (nested === undefined || !nested.trimStart().startsWith('*** Begin Patch')) return undefined
+    candidates.push(nested)
+  }
+
+  const [candidate] = candidates
+  if (
+    candidate === undefined
+    || candidates.some(value => value !== candidate)
+  ) {
+    return undefined
+  }
+  return candidate
 }
 
 /** Recover raw custom-tool input from pi-ai and provider fallback envelopes. */
 export function unwrapApplyPatchArguments(serialized: string): string {
-  if (serialized.startsWith('*** Begin Patch')) return serialized
-  try {
-    const parsed = JSON.parse(serialized) as unknown
-    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      const [entry] = Object.entries(parsed as Record<string, unknown>)
-      if (
-        entry !== undefined
-        && Object.keys(parsed).length === 1
-        && hasSingleTopLevelJsonMember(serialized)
-        && typeof entry[1] === 'string'
-        && (
-          entry[0] === 'patch'
-          || entry[0] === 'input'
-          || (entry[0] === 'arguments' && entry[1].trimStart().startsWith('*** Begin Patch'))
-        )
-      ) {
-        return entry[1]
-      }
-    }
-  } catch {
-    // Fall through to the version-mismatch error below.
-  }
+  const patch = tryUnwrapApplyPatchArguments(serialized)
+  if (patch !== undefined) return patch
   throw new PatchError(
     `dsh-smarter-edit: pi-ai did not return the expected raw custom-tool input; received ${describePatchArguments(serialized)}`,
     'PATCH_UNSUPPORTED',
@@ -181,7 +239,10 @@ function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
     if (delta.trim().length === 0) return ''
     throw new PatchError('dsh-smarter-edit: model emitted patch input after closing it', 'PATCH_UNSUPPORTED')
   }
-  if (state.mode === 'raw') return delta
+  if (state.mode === 'raw') {
+    state.emitted += delta
+    return delta
+  }
   state.buffer += delta
   if (state.mode === 'unknown') {
     const trimmed = state.buffer.trimStart()
@@ -194,6 +255,7 @@ function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
       state.mode = 'raw'
       const raw = state.buffer
       state.buffer = ''
+      state.emitted += raw
       return raw
     } else {
       throw new PatchError(
@@ -206,6 +268,7 @@ function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
     const raw = unwrapApplyPatchArguments(state.buffer)
     state.buffer = ''
     state.closed = true
+    state.emitted += raw
     return raw
   } catch {
     return ''
@@ -241,7 +304,12 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
       if (typeof chunk.argumentsDelta !== 'string') {
         throw new PatchError('dsh-smarter-edit: pi-ai emitted a non-string patch delta', 'PATCH_UNSUPPORTED')
       }
-      const state = patchIndexes.get(chunk.index) ?? { buffer: '', mode: 'unknown', closed: false }
+      const state = patchIndexes.get(chunk.index) ?? {
+        buffer: '',
+        emitted: '',
+        mode: 'unknown',
+        closed: false,
+      }
       patchIndexes.set(chunk.index, state)
       yield {
         ...chunk,
@@ -250,17 +318,39 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
       continue
     }
     if (isApplyPatchEnd(chunk)) {
+      const state = patchIndexes.get(chunk.index)
+      const finalPatch = unwrapApplyPatchArguments(chunk.block.arguments)
+      if (state !== undefined) {
+        let streamedPatch: string
+        if (state.mode === 'raw' || state.closed) {
+          streamedPatch = state.emitted
+        } else {
+          streamedPatch = unwrapApplyPatchArguments(state.buffer)
+        }
+        if (streamedPatch !== finalPatch) {
+          throw new PatchError(
+            'dsh-smarter-edit: pi-ai emitted different streamed and final patch input',
+            'PATCH_UNSUPPORTED',
+          )
+        }
+      }
       patchIndexes.delete(chunk.index)
       yield {
         ...chunk,
         block: {
           ...chunk.block,
-          arguments: unwrapApplyPatchArguments(chunk.block.arguments),
+          arguments: finalPatch,
         },
       } as unknown as T
       continue
     }
     yield value
+  }
+  if (patchIndexes.size > 0) {
+    throw new PatchError(
+      'dsh-smarter-edit: pi-ai ended with an incomplete patch tool call',
+      'PATCH_UNSUPPORTED',
+    )
   }
 }
 
