@@ -17,6 +17,7 @@ interface SnapshotLike {
     models: ModelsLike;
     [key: string]: unknown;
 }
+export declare const REJECTED_APPLY_PATCH_ARGUMENTS: string;
 /** Recover raw custom-tool input from pi-ai and provider fallback envelopes. */
 export declare function unwrapApplyPatchArguments(serialized: string): string;
 /** Restore raw durable calls to pi-ai's internal grammar-tool envelope for replay. */

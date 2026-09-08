@@ -74,7 +74,18 @@ properties is accepted only when every property independently restores the
 same patch bytes. Duplicate names, unknown properties, non-string values,
 conflicting payloads, and arbitrary prefixed text remain rejected.
 The normalized streamed input must also match the completed ToolCallBlock
-exactly; a mismatch or a stream that ends without that final block is rejected.
+exactly.
+
+An invalid envelope, a streamed/final mismatch, or an incomplete tool call is
+converted into a fixed rejected `apply_patch` call. DSH's ToolRuntime
+materializes it as an `isError: true` result with a raw-input retry instruction,
+so the Agent can continue to its next model step. The rejected candidate is
+never parsed or applied, and its ambiguous provider envelope is not persisted
+as executable input. The bridge preserves the call identity from pi-ai's start
+event, supplies a non-empty ID if the provider omitted one, and converts ID,
+name, or block-type changes into exactly one rejected call. A provider transport
+failure that aborts the source stream before it can form a tool call remains an
+LLM transport failure.
 
 DSH's public `llm/stream` middleware removes these temporary envelopes before
 DSH assembles, executes, or persists a completed call. A replay bridge restores

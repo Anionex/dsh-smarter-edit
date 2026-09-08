@@ -6,6 +6,7 @@ import { stream as streamOpenAIResponses } from '@earendil-works/pi-ai/api/opena
 import {
   bridgeSnapshot,
   installPiAiFreeformBridge,
+  REJECTED_APPLY_PATCH_ARGUMENTS,
   rewrapApplyPatchHistory,
   unwrapApplyPatchArguments,
   unwrapApplyPatchStream,
@@ -64,6 +65,147 @@ test('snapshot bridge forces raw grammar transport without a model capability ga
     {},
   ), 'stream')
   assert.equal(capturedModel.compat.supportsOpenAIGrammarTools, true)
+})
+
+test('snapshot bridge preserves apply_patch identity for a zero-delta pi-ai call', async () => {
+  const start = {
+    type: 'toolcall_start',
+    contentIndex: 0,
+    partial: {
+      content: [{
+        type: 'toolCall',
+        id: 'call-zero-delta',
+        name: 'apply_patch',
+        arguments: {},
+      }],
+    },
+  }
+  async function* source() {
+    yield start
+    yield { type: 'done' }
+  }
+  const models = {
+    streamSimple() {
+      return source()
+    },
+  }
+  const snapshot = bridgeSnapshot({ models }, 'start: "x"')
+  const events = []
+  for await (const event of snapshot.models.streamSimple(
+    { compat: {} },
+    { tools: [patchTool] },
+    {},
+  )) events.push(event)
+
+  assert.equal(events[0], start)
+  assert.deepEqual(events[1], {
+    type: 'toolcall_delta',
+    contentIndex: 0,
+    delta: '',
+    partial: start.partial,
+  })
+  assert.deepEqual(events[2], {
+    type: 'toolcall_end',
+    contentIndex: 0,
+    toolCall: {
+      type: 'toolCall',
+      id: 'call-zero-delta',
+      name: 'apply_patch',
+      arguments: { patch: REJECTED_APPLY_PATCH_ARGUMENTS },
+    },
+  })
+  assert.deepEqual(events[3], { type: 'done' })
+})
+
+test('snapshot bridge supplies one stable non-empty ID when pi-ai omits it', async () => {
+  const start = {
+    type: 'toolcall_start',
+    contentIndex: 0,
+    partial: {
+      content: [{
+        type: 'toolCall',
+        id: '',
+        name: 'apply_patch',
+        arguments: {},
+      }],
+    },
+  }
+  const end = {
+    type: 'toolcall_end',
+    contentIndex: 0,
+    toolCall: {
+      type: 'toolCall',
+      id: '',
+      name: 'apply_patch',
+      arguments: {},
+    },
+  }
+  async function* source() {
+    yield start
+    yield end
+  }
+  const models = {
+    streamSimple() {
+      return source()
+    },
+  }
+  const snapshot = bridgeSnapshot({ models }, 'start: "x"')
+  const events = []
+  for await (const event of snapshot.models.streamSimple(
+    { compat: {} },
+    { tools: [patchTool] },
+    {},
+  )) events.push(event)
+
+  const generatedId = events[0].partial.content[0].id
+  assert.match(generatedId, /^call_dsh_[a-f0-9]{32}$/u)
+  assert.equal(events[1].partial.content[0].id, generatedId)
+  assert.equal(events[2].toolCall.id, generatedId)
+  assert.equal(start.partial.content[0].id, '')
+  assert.equal(end.toolCall.id, '')
+})
+
+test('snapshot bridge replaces a malformed pi-ai end before adapter conversion', async () => {
+  const start = {
+    type: 'toolcall_start',
+    contentIndex: 0,
+    partial: {
+      content: [{
+        type: 'toolCall',
+        id: 'call-malformed-end',
+        name: 'apply_patch',
+        arguments: {},
+      }],
+    },
+  }
+  async function* source() {
+    yield start
+    yield { type: 'toolcall_end', contentIndex: 0 }
+  }
+  const snapshot = bridgeSnapshot({
+    models: {
+      streamSimple() {
+        return source()
+      },
+    },
+  }, 'start: "x"')
+  const events = []
+  for await (const event of snapshot.models.streamSimple(
+    { compat: {} },
+    { tools: [patchTool] },
+    {},
+  )) events.push(event)
+
+  assert.deepEqual(events[2], {
+    type: 'toolcall_end',
+    contentIndex: 0,
+    toolCall: {
+      type: 'toolCall',
+      id: 'call-malformed-end',
+      name: 'apply_patch',
+      arguments: { patch: REJECTED_APPLY_PATCH_ARGUMENTS },
+    },
+  })
 })
 
 test('pi-ai serializes the enriched schema as an OpenAI custom tool on the wire', async () => {
@@ -154,12 +296,14 @@ test('restores raw patch deltas and final arguments without touching other chunk
     yield {
       type: 'tool-call-delta',
       index: 1,
+      id: 'call-1',
       name: 'apply_patch',
       argumentsDelta: `{"patch":"${JSON.stringify(first).slice(1, -1)}`,
     }
     yield {
       type: 'tool-call-delta',
       index: 1,
+      id: 'call-1',
       argumentsDelta: `${JSON.stringify(second).slice(1, -1)}"}`,
     }
     yield {
@@ -317,6 +461,38 @@ test('restores raw patch deltas and final arguments without touching other chunk
   )
 })
 
+test('accepts a final raw patch after an identity-only empty delta', async () => {
+  const patch = '*** Begin Patch\n*** Add File: final-only.txt\n+final\n*** End Patch'
+  async function* source() {
+    yield {
+      type: 'block-start',
+      index: 0,
+      blockType: 'tool-call',
+    }
+    yield {
+      type: 'tool-call-delta',
+      index: 0,
+      id: 'call-final-only',
+      name: 'apply_patch',
+      argumentsDelta: '',
+    }
+    yield {
+      type: 'block-end',
+      index: 0,
+      block: {
+        type: 'tool-call',
+        id: 'call-final-only',
+        name: 'apply_patch',
+        arguments: JSON.stringify({ patch }),
+      },
+    }
+  }
+
+  const chunks = []
+  for await (const chunk of unwrapApplyPatchStream(source())) chunks.push(chunk)
+  assert.equal(chunks.at(-1).block.arguments, patch)
+})
+
 test('restores raw patch input from pi-ai fallback envelopes', async () => {
   const patch = '*** Begin Patch\n*** Add File: fallback.txt\n+fallback\n*** End Patch'
   const envelope = JSON.stringify({ input: patch })
@@ -325,6 +501,7 @@ test('restores raw patch input from pi-ai fallback envelopes', async () => {
       yield {
         type: 'tool-call-delta',
         index: 1,
+        id: 'call-1',
         ...(index === 0 ? { name: 'apply_patch' } : {}),
         argumentsDelta: character,
       }
@@ -357,6 +534,7 @@ test('restores DeepSeek raw patch input from its function-argument fallback', as
       yield {
         type: 'tool-call-delta',
         index: 1,
+        id: 'call-1',
         ...(index === 0 ? { name: 'apply_patch' } : {}),
         argumentsDelta: character,
       }
@@ -393,6 +571,7 @@ test('restores nested and agreeing DeepSeek patch argument fallbacks', async () 
         yield {
           type: 'tool-call-delta',
           index: 1,
+          id: 'call-1',
           ...(index === 0 ? { name: 'apply_patch' } : {}),
           argumentsDelta: character,
         }
@@ -418,7 +597,7 @@ test('restores nested and agreeing DeepSeek patch argument fallbacks', async () 
   }
 })
 
-test('rejects mismatched, invalid, and truncated streamed patch arguments', async () => {
+test('turns mismatched, invalid, and truncated patch streams into rejected tool calls', async () => {
   const patchA = '*** Begin Patch\n*** Add File: a.txt\n+a\n*** End Patch'
   const patchB = '*** Begin Patch\n*** Add File: b.txt\n+b\n*** End Patch'
   const deltaEnvelope = JSON.stringify({ arguments: JSON.stringify({ patch: patchA }) })
@@ -426,6 +605,7 @@ test('rejects mismatched, invalid, and truncated streamed patch arguments', asyn
   const deltaChunk = {
     type: 'tool-call-delta',
     index: 1,
+    id: 'call-1',
     name: 'apply_patch',
     argumentsDelta: deltaEnvelope,
   }
@@ -443,11 +623,9 @@ test('rejects mismatched, invalid, and truncated streamed patch arguments', asyn
     yield deltaChunk
     yield finalChunk
   }
-  await assert.rejects(async () => {
-    for await (const _chunk of unwrapApplyPatchStream(mismatched())) {
-      // Drain until the final mismatch is detected.
-    }
-  }, /different streamed and final patch input/u)
+  const mismatchedChunks = []
+  for await (const chunk of unwrapApplyPatchStream(mismatched())) mismatchedChunks.push(chunk)
+  assert.equal(mismatchedChunks.at(-1).block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
   assert.equal(deltaChunk.argumentsDelta, deltaEnvelope)
   assert.equal(finalChunk.block.arguments, finalEnvelope)
 
@@ -455,6 +633,7 @@ test('rejects mismatched, invalid, and truncated streamed patch arguments', asyn
     yield {
       type: 'tool-call-delta',
       index: 1,
+      id: 'call-2',
       name: 'apply_patch',
       argumentsDelta: '{"arguments":false}',
     }
@@ -469,26 +648,216 @@ test('rejects mismatched, invalid, and truncated streamed patch arguments', asyn
       },
     }
   }
-  await assert.rejects(async () => {
-    for await (const _chunk of unwrapApplyPatchStream(invalidThenFinal())) {
-      // Drain until the invalid streamed input is detected.
-    }
-  }, /expected raw custom-tool input/u)
+  const invalidChunks = []
+  for await (const chunk of unwrapApplyPatchStream(invalidThenFinal())) invalidChunks.push(chunk)
+  assert.equal(invalidChunks.at(-1).block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
 
   for (const argumentsDelta of ['{"arguments":false}', patchA]) {
     async function* truncated() {
       yield {
         type: 'tool-call-delta',
         index: 1,
+        id: 'call-truncated',
         name: 'apply_patch',
         argumentsDelta,
       }
     }
-    await assert.rejects(async () => {
-      for await (const _chunk of unwrapApplyPatchStream(truncated())) {
-        // Drain until the missing final block is detected.
-      }
-    }, /incomplete patch tool call/u)
+    const truncatedChunks = []
+    for await (const chunk of unwrapApplyPatchStream(truncated())) truncatedChunks.push(chunk)
+    assert.equal(truncatedChunks.at(-1).type, 'block-end')
+    assert.equal(truncatedChunks.at(-1).block.id, 'call-truncated')
+    assert.equal(truncatedChunks.at(-1).block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
+  }
+
+  async function* finishedWithoutEnd() {
+    yield { type: 'block-start', index: 1, blockType: 'tool-call' }
+    yield {
+      type: 'tool-call-delta',
+      index: 1,
+      id: 'call-before-finish',
+      name: 'apply_patch',
+      argumentsDelta: patchA,
+    }
+    yield { type: 'finish', reason: { kind: 'tool-calls' } }
+  }
+  const finishedChunks = []
+  for await (const chunk of unwrapApplyPatchStream(finishedWithoutEnd())) finishedChunks.push(chunk)
+  assert.equal(finishedChunks.at(-2).type, 'block-end')
+  assert.equal(finishedChunks.at(-2).block.id, 'call-before-finish')
+  assert.equal(finishedChunks.at(-2).block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
+  assert.equal(finishedChunks.at(-1).type, 'finish')
+
+  async function* nonStringFinal() {
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: 'call-non-string',
+        name: 'apply_patch',
+        arguments: { patch: patchA },
+      },
+    }
+  }
+  const nonStringChunks = []
+  for await (const chunk of unwrapApplyPatchStream(nonStringFinal())) nonStringChunks.push(chunk)
+  assert.equal(nonStringChunks[0].block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
+
+  async function* emptyIdFinal() {
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: '',
+        name: 'apply_patch',
+        arguments: JSON.stringify({ patch: patchA }),
+      },
+    }
+  }
+  const emptyIdChunks = []
+  for await (const chunk of unwrapApplyPatchStream(emptyIdFinal())) emptyIdChunks.push(chunk)
+  assert.equal(emptyIdChunks[0].block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
+  assert.match(emptyIdChunks[0].block.id, /^call_dsh_[a-f0-9]{32}$/u)
+
+  async function* missingId() {
+    yield {
+      type: 'tool-call-delta',
+      index: 1,
+      name: 'apply_patch',
+      argumentsDelta: patchA,
+    }
+  }
+  const missingIdChunks = []
+  for await (const chunk of unwrapApplyPatchStream(missingId())) missingIdChunks.push(chunk)
+  const deltaId = missingIdChunks[0].id
+  const generatedId = missingIdChunks.at(-1).block.id
+  assert.match(generatedId, /^call_dsh_[a-f0-9]{32}$/u)
+  assert.equal(deltaId, generatedId)
+
+  async function* lateIdFinal() {
+    yield {
+      type: 'tool-call-delta',
+      index: 1,
+      name: 'apply_patch',
+      argumentsDelta: patchA,
+    }
+    yield {
+      type: 'block-end',
+      index: 1,
+      block: {
+        type: 'tool-call',
+        id: 'call-late',
+        name: 'apply_patch',
+        arguments: patchA,
+      },
+    }
+  }
+  const lateIdChunks = []
+  for await (const chunk of unwrapApplyPatchStream(lateIdFinal())) lateIdChunks.push(chunk)
+  assert.match(lateIdChunks[0].id, /^call_dsh_[a-f0-9]{32}$/u)
+  assert.equal(lateIdChunks.at(-1).block.id, lateIdChunks[0].id)
+  assert.equal(lateIdChunks.at(-1).block.arguments, REJECTED_APPLY_PATCH_ARGUMENTS)
+})
+
+test('rejects apply_patch call identity and block-type conflicts exactly once', async () => {
+  const patch = '*** Begin Patch\n*** Add File: identity.txt\n+x\n*** End Patch'
+  const cases = [
+    [
+      {
+        type: 'tool-call-delta',
+        index: 1,
+        id: 'call-a',
+        name: 'apply_patch',
+        argumentsDelta: patch,
+      },
+      {
+        type: 'block-end',
+        index: 1,
+        block: {
+          type: 'tool-call',
+          id: 'call-b',
+          name: 'apply_patch',
+          arguments: patch,
+        },
+      },
+    ],
+    [
+      {
+        type: 'tool-call-delta',
+        index: 1,
+        id: 'call-a',
+        name: 'apply_patch',
+        argumentsDelta: patch,
+      },
+      {
+        type: 'tool-call-delta',
+        index: 1,
+        id: 'call-a',
+        name: 'read',
+        argumentsDelta: '',
+      },
+      {
+        type: 'block-end',
+        index: 1,
+        block: {
+          type: 'tool-call',
+          id: 'call-a',
+          name: 'apply_patch',
+          arguments: patch,
+        },
+      },
+    ],
+    [
+      {
+        type: 'tool-call-delta',
+        index: 1,
+        id: 'call-a',
+        name: 'apply_patch',
+        argumentsDelta: patch,
+      },
+      {
+        type: 'block-end',
+        index: 1,
+        block: {
+          type: 'tool-call',
+          id: 'call-a',
+          name: 'read',
+          arguments: '{"path":"identity.txt"}',
+        },
+      },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ],
+    [
+      {
+        type: 'tool-call-delta',
+        index: 1,
+        id: 'call-a',
+        name: 'apply_patch',
+        argumentsDelta: patch,
+      },
+      {
+        type: 'block-end',
+        index: 1,
+        block: { type: 'text', text: patch },
+      },
+    ],
+  ]
+
+  for (const input of cases) {
+    async function* source() {
+      yield* input
+    }
+    const chunks = []
+    for await (const chunk of unwrapApplyPatchStream(source())) chunks.push(chunk)
+    const ends = chunks.filter(chunk => chunk.type === 'block-end')
+    assert.equal(ends.length, 1)
+    assert.deepEqual(ends[0].block, {
+      type: 'tool-call',
+      id: 'call-a',
+      name: 'apply_patch',
+      arguments: REJECTED_APPLY_PATCH_ARGUMENTS,
+    })
   }
 })
 

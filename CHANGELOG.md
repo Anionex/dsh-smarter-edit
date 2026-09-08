@@ -6,6 +6,22 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-09-08
+
+### Fixed
+
+- Convert malformed, conflicting, mismatched, and incomplete `apply_patch`
+  transport input into a failed tool result so the model can retry on the next
+  Agent step instead of terminating the LLM stream.
+- Keep rejected candidate input fail-closed: no candidate patch is executed,
+  and the failed call carries a fixed retry instruction rather than accepting
+  or persisting the ambiguous provider envelope.
+- Preserve `apply_patch` identity from pi-ai's start event, generate a
+  non-empty ID when the provider omits one, and reject ID, name, or block-type
+  changes with exactly one completed failed call.
+- Restrict the legacy `{ patch }` execution fallback to an exact single-field
+  object so additional fields cannot be silently ignored.
+
 ## [0.1.7] - 2026-09-08
 
 ### Fixed
@@ -99,7 +115,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.8
 [0.1.7]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.7
 [0.1.6]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.6
 [0.1.5]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.5

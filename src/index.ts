@@ -3,7 +3,11 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import z from '@deepseek-ai/schemastery'
 import { defineTool, ToolArgsError, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { installPiAiFreeformBridge, unwrapApplyPatchStream } from './freeform-bridge.js'
+import {
+  installPiAiFreeformBridge,
+  REJECTED_APPLY_PATCH_ARGUMENTS,
+  unwrapApplyPatchStream,
+} from './freeform-bridge.js'
 import { runApplyPatch } from './host.js'
 import { parsePatch } from './parser.js'
 
@@ -29,11 +33,18 @@ const NATIVE_MUTATION_SECTION_NAMES = new Set(['tool:edit', 'tool:write'])
 
 /** Accept the restored raw transport and the legacy envelope for compatibility. */
 export function applyPatchText(args: unknown): string {
+  if (args === REJECTED_APPLY_PATCH_ARGUMENTS) {
+    throw new ToolArgsError([
+      'apply_patch input was rejected; retry with raw patch text starting with *** Begin Patch, without JSON or a patch field',
+    ])
+  }
   if (typeof args === 'string') return args
   if (
     typeof args === 'object'
     && args !== null
     && !Array.isArray(args)
+    && Object.keys(args).length === 1
+    && Object.hasOwn(args, 'patch')
     && typeof (args as Record<string, unknown>).patch === 'string'
   ) {
     return (args as { patch: string }).patch
@@ -47,7 +58,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
   const releaseBridge = await installPiAiFreeformBridge()
   ctx.effect(() => releaseBridge, 'dsh-smarter-edit pi-ai freeform bridge')
-  ctx.on('llm/stream', (_options, next) => unwrapApplyPatchStream(next()))
+  ctx.on('llm/stream', (_options, next) => unwrapApplyPatchStream(next()), { prepend: true })
 
   ctx.systemPrompt.section({
     name: 'tool:apply-patch',

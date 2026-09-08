@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict'
+import { Context } from '@deepseek-ai/cordis'
+import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { access, readFile } from 'node:fs/promises'
 import { isAbsolute } from 'node:path'
 import test from 'node:test'
-import { apply, applyPatchText, inject, name } from '../lib/index.js'
+import {
+  apply,
+  applyPatchText,
+  inject,
+  name,
+  REJECTED_APPLY_PATCH_ARGUMENTS,
+} from '../lib/index.js'
 
 test('registers one raw patch string tool and filters native mutation tools', async () => {
   let definition
   let middleware
   let llmMiddleware
+  let llmMiddlewareOptions
   const sections = []
   const disposers = []
   const ctx = {
@@ -15,9 +24,12 @@ test('registers one raw patch string tool and filters native mutation tools', as
     tools: { register(value) { definition = value; return () => undefined } },
     systemPrompt: { section(value) { sections.push(value); return () => undefined } },
     effect(setup) { disposers.push(setup()) },
-    on(event, listener) {
+    on(event, listener, options) {
       if (event === 'system-prompt/assemble') middleware = listener
-      if (event === 'llm/stream') llmMiddleware = listener
+      if (event === 'llm/stream') {
+        llmMiddleware = listener
+        llmMiddlewareOptions = options
+      }
       return () => undefined
     },
   }
@@ -32,10 +44,23 @@ test('registers one raw patch string tool and filters native mutation tools', as
     assert.deepEqual(definition.parameters.required, ['patch'])
     assert.equal(definition.parameters.properties.patch.type, 'string')
     assert.equal(definition.description, 'Create, update, move, and delete files by applying a patch.')
+    assert.deepEqual(llmMiddlewareOptions, { prepend: true })
     assert.equal(sections[0].name, 'tool:apply-patch')
     const raw = '*** Begin Patch\n*** Add File: a.txt\n+x\n*** End Patch\n'
     assert.equal(applyPatchText(raw), raw)
     assert.equal(applyPatchText({ patch: raw }), raw)
+    assert.throws(
+      () => applyPatchText({ patch: raw, arguments: raw }),
+      /arguments must be raw apply_patch text/u,
+    )
+    assert.throws(
+      () => applyPatchText(Object.assign(Object.create({ patch: raw }), { extra: true })),
+      /arguments must be raw apply_patch text/u,
+    )
+    assert.throws(
+      () => applyPatchText(REJECTED_APPLY_PATCH_ARGUMENTS),
+      /retry with raw patch text starting with \*\*\* Begin Patch/u,
+    )
     assert.deepEqual(definition.presentCall(raw).locations, [{ path: 'a.txt' }])
     await assert.rejects(
       definition.execute({}, {}),
@@ -47,6 +72,7 @@ test('registers one raw patch string tool and filters native mutation tools', as
         yield {
           type: 'tool-call-delta',
           index: 0,
+          id: 'call-1',
           ...(index === 0 ? { name: 'apply_patch' } : {}),
           argumentsDelta: character,
         }
@@ -122,12 +148,36 @@ test('keeps native mutation tools when replacement is disabled', async () => {
   }
 })
 
+test('materializes rejected provider input as a retryable DSH tool error', async () => {
+  const ctx = new Context()
+  ctx.provide('systemPrompt', {
+    tools() { return () => undefined },
+    section() { return () => undefined },
+  })
+  ctx.provide('fs', { sandboxMode: undefined })
+  ctx.provide('llm', {})
+  new ToolRuntime(ctx)
+  await apply(ctx, { replaceNativeEdit: false })
+
+  const result = await ctx.tools.execute({
+    callId: 'call-rejected',
+    name: 'apply_patch',
+    arguments: REJECTED_APPLY_PATCH_ARGUMENTS,
+    signal: new AbortController().signal,
+  })
+
+  assert.equal(result.isError, true)
+  assert.equal(result.error.info.name, 'ToolArgsError')
+  assert.equal(result.error.info.code, 'INVALID_ARGS')
+  assert.match(result.content[0].text, /retry with raw patch text starting with \*\*\* Begin Patch/u)
+})
+
 test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const root = new URL('../', import.meta.url)
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-smarter-edit')
-  assert.equal(pkg.version, '0.1.7')
+  assert.equal(pkg.version, '0.1.8')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')

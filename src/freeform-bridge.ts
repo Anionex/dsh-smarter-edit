@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { PatchError } from './errors.js'
 
 export const APPLY_PATCH_TOOL_NAME = 'apply_patch'
@@ -62,6 +63,7 @@ function isPatchStringSchema(parameters: unknown): boolean {
 interface StreamChunkLike {
   type?: unknown
   index?: unknown
+  id?: unknown
   name?: unknown
   argumentsDelta?: unknown
   block?: unknown
@@ -71,11 +73,23 @@ interface StreamChunkLike {
 interface PatchDeltaState {
   buffer: string
   emitted: string
+  id: string
   mode: 'unknown' | 'json' | 'raw'
   closed: boolean
+  rejected: boolean
+  sawArgumentBytes: boolean
 }
 
 const KNOWN_PATCH_ARGUMENT_NAMES = new Set(['patch', 'input', 'arguments'])
+export const REJECTED_APPLY_PATCH_ARGUMENTS = [
+  '*** Begin Patch',
+  '*** Invalid Tool Input: retry apply_patch with raw patch text, without JSON or a patch field',
+  '*** End Patch',
+].join('\n')
+
+function syntheticToolCallId(): string {
+  return `call_dsh_${randomUUID().replaceAll('-', '')}`
+}
 
 function describePatchString(value: string): string {
   const trimmed = value.trimStart()
@@ -276,13 +290,125 @@ function decodeApplyPatchDelta(delta: string, state: PatchDeltaState): string {
 }
 
 function isApplyPatchEnd(chunk: StreamChunkLike): chunk is StreamChunkLike & {
-  block: { type: 'tool-call'; name: string; arguments: string; [key: string]: unknown }
+  block: { type: 'tool-call'; id?: unknown; name: string; arguments?: unknown; [key: string]: unknown }
 } {
   if (chunk.type !== 'block-end' || typeof chunk.block !== 'object' || chunk.block === null) return false
-  const block = chunk.block as { type?: unknown; name?: unknown; arguments?: unknown }
+  const block = chunk.block as { type?: unknown; name?: unknown }
   return block.type === 'tool-call'
     && block.name === APPLY_PATCH_TOOL_NAME
-    && typeof block.arguments === 'string'
+}
+
+function rejectedApplyPatchEnd(index: unknown, id?: string): StreamChunkLike {
+  return {
+    type: 'block-end',
+    index,
+    block: {
+      type: 'tool-call',
+      id: id ?? syntheticToolCallId(),
+      name: APPLY_PATCH_TOOL_NAME,
+      arguments: REJECTED_APPLY_PATCH_ARGUMENTS,
+    },
+  }
+}
+
+function bridgeApplyPatchStartEvents(source: unknown): unknown {
+  if (
+    (typeof source !== 'object' && typeof source !== 'function')
+    || source === null
+    || typeof (source as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] !== 'function'
+  ) return source
+
+  return (async function* () {
+    const applyPatchIds = new Map<number, string>()
+    for await (const value of source as AsyncIterable<unknown>) {
+      if (typeof value !== 'object' || value === null) {
+        yield value
+        continue
+      }
+      const event = value as {
+        type?: unknown
+        contentIndex?: unknown
+        partial?: { content?: unknown }
+        toolCall?: { id?: unknown; name?: unknown; [key: string]: unknown }
+      }
+      if ((event.type === 'done' || event.type === 'error') && applyPatchIds.size > 0) {
+        for (const [contentIndex, id] of applyPatchIds) {
+          yield {
+            type: 'toolcall_end',
+            contentIndex,
+            toolCall: {
+              type: 'toolCall',
+              id,
+              name: APPLY_PATCH_TOOL_NAME,
+              arguments: { patch: REJECTED_APPLY_PATCH_ARGUMENTS },
+            },
+          }
+        }
+        applyPatchIds.clear()
+        yield value
+        continue
+      }
+      if (
+        event.type !== 'toolcall_start'
+        || typeof event.contentIndex !== 'number'
+        || !Array.isArray(event.partial?.content)
+      ) {
+        const knownId = typeof event.contentIndex === 'number'
+          ? applyPatchIds.get(event.contentIndex)
+          : undefined
+        if (event.type === 'toolcall_end' && knownId !== undefined) {
+          applyPatchIds.delete(event.contentIndex as number)
+          if (typeof event.toolCall !== 'object' || event.toolCall === null) {
+            yield {
+              type: 'toolcall_end',
+              contentIndex: event.contentIndex,
+              toolCall: {
+                type: 'toolCall',
+                id: knownId,
+                name: APPLY_PATCH_TOOL_NAME,
+                arguments: { patch: REJECTED_APPLY_PATCH_ARGUMENTS },
+              },
+            }
+            continue
+          }
+          if (typeof event.toolCall.id !== 'string' || event.toolCall.id.length === 0) {
+            yield {
+              ...event,
+              toolCall: { ...event.toolCall, id: knownId },
+            }
+            continue
+          }
+        }
+        yield value
+        continue
+      }
+      const content = event.partial.content
+      const block = content[event.contentIndex] as {
+        type?: unknown
+        id?: unknown
+        name?: unknown
+        [key: string]: unknown
+      } | undefined
+      if (block?.type !== 'toolCall' || block.name !== APPLY_PATCH_TOOL_NAME) {
+        yield value
+        continue
+      }
+      const id = typeof block.id === 'string' && block.id.length > 0
+        ? block.id
+        : syntheticToolCallId()
+      applyPatchIds.set(event.contentIndex, id)
+      const partial = id === block.id
+        ? event.partial
+        : {
+            ...event.partial,
+            content: content.map((candidate, index) => index === event.contentIndex
+              ? { ...block, id }
+              : candidate),
+          }
+      yield partial === event.partial ? value : { ...event, partial }
+      yield { type: 'toolcall_delta', contentIndex: event.contentIndex, delta: '', partial }
+    }
+  })()
 }
 
 /**
@@ -297,44 +423,93 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
       continue
     }
     const chunk = value as StreamChunkLike
+    if (chunk.type === 'finish' && patchIndexes.size > 0) {
+      for (const [index, state] of patchIndexes) {
+        yield rejectedApplyPatchEnd(index, state.id) as T
+      }
+      patchIndexes.clear()
+      yield value
+      continue
+    }
     if (
       chunk.type === 'tool-call-delta'
       && (chunk.name === APPLY_PATCH_TOOL_NAME || patchIndexes.has(chunk.index))
     ) {
-      if (typeof chunk.argumentsDelta !== 'string') {
-        throw new PatchError('dsh-smarter-edit: pi-ai emitted a non-string patch delta', 'PATCH_UNSUPPORTED')
-      }
-      const state = patchIndexes.get(chunk.index) ?? {
+      const existingState = patchIndexes.get(chunk.index)
+      const state = existingState ?? {
         buffer: '',
         emitted: '',
+        id: typeof chunk.id === 'string' && chunk.id.length > 0
+          ? chunk.id
+          : syntheticToolCallId(),
         mode: 'unknown',
         closed: false,
+        rejected: false,
+        sawArgumentBytes: false,
+      }
+      if (chunk.name !== undefined && chunk.name !== APPLY_PATCH_TOOL_NAME) state.rejected = true
+      if (typeof chunk.id === 'string' && chunk.id.length > 0) {
+        if (state.id !== chunk.id) state.rejected = true
+      } else if (chunk.id !== undefined && chunk.id !== '') {
+        state.rejected = true
       }
       patchIndexes.set(chunk.index, state)
+      let argumentsDelta = ''
+      if (!state.rejected && typeof chunk.argumentsDelta === 'string') {
+        if (chunk.argumentsDelta.length > 0) state.sawArgumentBytes = true
+        try {
+          argumentsDelta = decodeApplyPatchDelta(chunk.argumentsDelta, state)
+        } catch (error) {
+          if (!(error instanceof PatchError)) throw error
+          state.rejected = true
+        }
+      } else if (typeof chunk.argumentsDelta !== 'string') {
+        state.rejected = true
+      }
       yield {
         ...chunk,
-        argumentsDelta: decodeApplyPatchDelta(chunk.argumentsDelta, state),
+        id: state.id,
+        name: APPLY_PATCH_TOOL_NAME,
+        argumentsDelta,
       } as unknown as T
       continue
     }
+    const trackedState = patchIndexes.get(chunk.index)
+    if (chunk.type === 'block-end' && trackedState !== undefined && !isApplyPatchEnd(chunk)) {
+      patchIndexes.delete(chunk.index)
+      yield rejectedApplyPatchEnd(chunk.index, trackedState.id) as T
+      continue
+    }
     if (isApplyPatchEnd(chunk)) {
-      const state = patchIndexes.get(chunk.index)
-      const finalPatch = unwrapApplyPatchArguments(chunk.block.arguments)
-      if (state !== undefined) {
-        let streamedPatch: string
-        if (state.mode === 'raw' || state.closed) {
-          streamedPatch = state.emitted
-        } else {
-          streamedPatch = unwrapApplyPatchArguments(state.buffer)
+      const state = trackedState
+      let rejected = state?.rejected ?? false
+      let finalPatch: string | undefined
+      const finalId = typeof chunk.block.id === 'string' && chunk.block.id.length > 0
+        ? chunk.block.id
+        : undefined
+      if (finalId === undefined) rejected = true
+      if (state !== undefined && finalId !== state.id) rejected = true
+      if (!rejected && typeof chunk.block.arguments === 'string') {
+        try {
+          finalPatch = unwrapApplyPatchArguments(chunk.block.arguments)
+          if (state?.sawArgumentBytes) {
+            const streamedPatch = state.mode === 'raw' || state.closed
+              ? state.emitted
+              : unwrapApplyPatchArguments(state.buffer)
+            rejected = streamedPatch !== finalPatch
+          }
+        } catch (error) {
+          if (!(error instanceof PatchError)) throw error
+          rejected = true
         }
-        if (streamedPatch !== finalPatch) {
-          throw new PatchError(
-            'dsh-smarter-edit: pi-ai emitted different streamed and final patch input',
-            'PATCH_UNSUPPORTED',
-          )
-        }
+      } else {
+        rejected = true
       }
       patchIndexes.delete(chunk.index)
+      if (rejected || finalPatch === undefined) {
+        yield rejectedApplyPatchEnd(chunk.index, state?.id ?? finalId) as T
+        continue
+      }
       yield {
         ...chunk,
         block: {
@@ -346,11 +521,8 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
     }
     yield value
   }
-  if (patchIndexes.size > 0) {
-    throw new PatchError(
-      'dsh-smarter-edit: pi-ai ended with an incomplete patch tool call',
-      'PATCH_UNSUPPORTED',
-    )
+  for (const [index, state] of patchIndexes) {
+    yield rejectedApplyPatchEnd(index, state.id) as T
   }
 }
 
@@ -398,7 +570,8 @@ export function bridgeSnapshot(snapshot: SnapshotLike, grammar: string): Snapsho
         return (model: unknown, context: PiContextLike, options: unknown): unknown => {
           const bridgedContext = withApplyPatchGrammar(context, grammar)
           const bridgedModel = bridgedContext === context ? model : grammarCapableModel(model)
-          return target.streamSimple(bridgedModel, bridgedContext, options)
+          const stream = target.streamSimple(bridgedModel, bridgedContext, options)
+          return bridgedContext === context ? stream : bridgeApplyPatchStartEvents(stream)
         }
       }
       const value = Reflect.get(target, property, target)
