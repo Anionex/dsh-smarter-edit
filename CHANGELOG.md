@@ -6,6 +6,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-09-08
+
+### Fixed
+
+- Enforce the legacy `{ patch }` fallback as exactly one own property,
+  including non-enumerable and symbol properties in the key count.
+
 ## [0.1.8] - 2026-09-08
 
 ### Fixed
@@ -115,7 +122,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.9
 [0.1.8]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.8
 [0.1.7]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.7
 [0.1.6]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.6

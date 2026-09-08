@@ -39,12 +39,15 @@ export function applyPatchText(args: unknown): string {
     ])
   }
   if (typeof args === 'string') return args
+  const ownKeys = typeof args === 'object' && args !== null && !Array.isArray(args)
+    ? Reflect.ownKeys(args)
+    : []
   if (
     typeof args === 'object'
     && args !== null
     && !Array.isArray(args)
-    && Object.keys(args).length === 1
-    && Object.hasOwn(args, 'patch')
+    && ownKeys.length === 1
+    && ownKeys[0] === 'patch'
     && typeof (args as Record<string, unknown>).patch === 'string'
   ) {
     return (args as { patch: string }).patch

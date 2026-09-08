@@ -57,6 +57,22 @@ test('registers one raw patch string tool and filters native mutation tools', as
       () => applyPatchText(Object.assign(Object.create({ patch: raw }), { extra: true })),
       /arguments must be raw apply_patch text/u,
     )
+    const hiddenPatch = { extra: true }
+    Object.defineProperty(hiddenPatch, 'patch', { value: raw })
+    assert.throws(
+      () => applyPatchText(hiddenPatch),
+      /arguments must be raw apply_patch text/u,
+    )
+    const hiddenExtra = { patch: raw }
+    Object.defineProperty(hiddenExtra, 'extra', { value: true })
+    assert.throws(
+      () => applyPatchText(hiddenExtra),
+      /arguments must be raw apply_patch text/u,
+    )
+    assert.throws(
+      () => applyPatchText({ patch: raw, [Symbol('extra')]: true }),
+      /arguments must be raw apply_patch text/u,
+    )
     assert.throws(
       () => applyPatchText(REJECTED_APPLY_PATCH_ARGUMENTS),
       /retry with raw patch text starting with \*\*\* Begin Patch/u,
@@ -177,7 +193,7 @@ test('package is a portable prebuilt DSH Profile Bundle', async () => {
   const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const workspace = await readFile(new URL('pnpm-workspace.yaml', root), 'utf8')
   assert.equal(pkg.name, '@anionex/dsh-smarter-edit')
-  assert.equal(pkg.version, '0.1.8')
+  assert.equal(pkg.version, '0.1.9')
   assert.equal(pkg.description, 'A better approach to editing files in DSH.')
   assert.notEqual(pkg.private, true)
   assert.equal(pkg.publishConfig.access, 'public')
