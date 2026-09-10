@@ -17,6 +17,10 @@ interface SnapshotLike {
     models: ModelsLike;
     [key: string]: unknown;
 }
+/** Whether requests for `provider` have been seen flowing through the pi-ai adapter. */
+export declare function providerUsesFreeformTransport(provider: string | undefined): boolean;
+/** Test-only: forget the observed provider routes. */
+export declare function resetFreeformTransportObservation(): void;
 export declare const REJECTED_APPLY_PATCH_ARGUMENTS: string;
 /** Recover raw custom-tool input from pi-ai and provider fallback envelopes. */
 export declare function unwrapApplyPatchArguments(serialized: string): string;

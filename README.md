@@ -157,6 +157,41 @@ Verify that the bundle is mounted:
 dsh --profile desktop --dump-config | grep tool-apply-patch
 ```
 
+## Recommended configuration
+
+Installing the plugin does not change how requests reach the model. Freeform
+`apply_patch` needs a route whose adapter can carry an OpenAI **custom tool with
+a Lark grammar**; DSH serves that through `dsh-llm-pi-ai` with the
+`openai-responses` protocol. On the stock DeepSeek route (`dsh-llm-deepseek`,
+Chat Completions) the same tool is sent as an ordinary JSON function tool
+instead.
+
+The plugin cannot move a session between routes — which provider a session uses
+is your configuration, not the plugin's. Add one provider once under
+**Settings → Models → custom provider**, then pick its model in the model
+picker:
+
+| Field | Value |
+| --- | --- |
+| Provider ID | `deepseek-responses` — a new id; do not reuse `deepseek-official` |
+| Display name | DeepSeek (Responses) |
+| API base URL | `https://api.deepseek.com` |
+| API protocol | `openai-responses` |
+| API key | your DeepSeek key |
+| Model catalog | the models you use, e.g. `deepseek-v4.1-flash-expires-on-0910` (context 1000000, max output 256000) |
+
+The stock `deepseek-official` route stays installed, so work that depends on it
+(image input, FIM) is unaffected.
+
+**Verify.** The decisive check is the outgoing request body: `apply_patch` must
+be `type: "custom"` with `format.syntax: "lark"`. As a symptom-level check, the
+first `apply_patch` result of a session carries a one-time note while the
+fallback path is active; set `notifyFallbackTransport: false` to silence it.
+
+**Measured effect.** [`docs/deepswe-v1.1-apply-patch-vs-native-editor.md`](docs/deepswe-v1.1-apply-patch-vs-native-editor.md)
+compares the two configurations on DeepSWE v1.1 (Chinese:
+[`.zh.md`](docs/deepswe-v1.1-apply-patch-vs-native-editor.zh.md)).
+
 ## How it works
 
 1. The model sends a patch between `*** Begin Patch` and `*** End Patch`.
@@ -224,11 +259,16 @@ Profile patch values, with defaults:
 - id: tool-apply-patch
   config:
     replaceNativeEdit: true
+    notifyFallbackTransport: true
 ```
 
 Set `replaceNativeEdit: false` only when you want `edit`, `write`, and
 `str_replace_editor` alongside `apply_patch`. It does not change freeform
 transport or transaction behavior.
+
+`notifyFallbackTransport` controls the one-time note described under
+[Recommended configuration](#recommended-configuration). It never changes the
+transport; it only decides whether a session is told which one it is on.
 
 ## Benchmarking
 

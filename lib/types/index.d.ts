@@ -5,6 +5,8 @@ export declare const inject: string[];
 export interface Config {
     /** Remove native file-mutation schemas and guidance while this plugin is active. */
     replaceNativeEdit?: boolean;
+    /** Tell a session once when its model route cannot carry the freeform transport. */
+    notifyFallbackTransport?: boolean;
 }
 export declare const Config: z<Config>;
 /** Accept the restored raw transport and the legacy envelope for compatibility. */
@@ -18,4 +20,5 @@ export * from './host.js';
 export * from './matcher.js';
 export * from './parser.js';
 export * from './source-file.js';
+export * from './transport-notice.js';
 export * from './types.js';

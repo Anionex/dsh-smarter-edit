@@ -6,7 +6,9 @@ import { stream as streamOpenAIResponses } from '@earendil-works/pi-ai/api/opena
 import {
   bridgeSnapshot,
   installPiAiFreeformBridge,
+  providerUsesFreeformTransport,
   REJECTED_APPLY_PATCH_ARGUMENTS,
+  resetFreeformTransportObservation,
   rewrapApplyPatchHistory,
   unwrapApplyPatchArguments,
   unwrapApplyPatchStream,
@@ -944,5 +946,51 @@ test('rewraps history through pi-ai prepared-call streams', async () => {
     release?.()
     if (descriptor === undefined) delete prototype.prepareCall
     else Object.defineProperty(prototype, 'prepareCall', descriptor)
+  }
+})
+
+test('records which provider routes really flow through the pi-ai adapter', async () => {
+  const prototype = PiAiAdapter.prototype
+  const streamDescriptor = Object.getOwnPropertyDescriptor(prototype, 'stream')
+  const prepareDescriptor = Object.getOwnPropertyDescriptor(prototype, 'prepareCall')
+  resetFreeformTransportObservation()
+  Object.defineProperty(prototype, 'stream', {
+    configurable: true,
+    writable: true,
+    value() {
+      return (async function* empty() {})()
+    },
+  })
+  if (prepareDescriptor !== undefined) {
+    Object.defineProperty(prototype, 'prepareCall', {
+      configurable: true,
+      writable: true,
+      async value() {
+        return { model: {}, stream: () => (async function* empty() {})() }
+      },
+    })
+  }
+  let release
+  try {
+    release = await installPiAiFreeformBridge()
+    assert.equal(providerUsesFreeformTransport('deepseek-responses'), false)
+    assert.equal(providerUsesFreeformTransport(undefined), false)
+    for await (const _event of prototype.stream.call({}, {
+      provider: 'deepseek-responses',
+      messages: [],
+      tools: [],
+    })) { /* drain */ }
+    assert.equal(providerUsesFreeformTransport('deepseek-responses'), true)
+    assert.equal(providerUsesFreeformTransport('deepseek-official'), false)
+    await prototype.prepareCall.call({}, 'openai', 'gpt-5.6-sol')
+    assert.equal(providerUsesFreeformTransport('openai'), true)
+    assert.equal(providerUsesFreeformTransport('deepseek-official'), false)
+  } finally {
+    release?.()
+    if (streamDescriptor === undefined) delete prototype.stream
+    else Object.defineProperty(prototype, 'stream', streamDescriptor)
+    if (prepareDescriptor === undefined) delete prototype.prepareCall
+    else Object.defineProperty(prototype, 'prepareCall', prepareDescriptor)
+    resetFreeformTransportObservation()
   }
 })

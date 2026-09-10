@@ -78,6 +78,13 @@ Agent 可以继续进入下一个模型 step。候选补丁不会被解析或执
 内部恢复 pi-ai 所需的包装。因此实时参数、会话日志和 Trajectory 参数视图都
 保留原始补丁文本。
 
+适配层同时记录哪些 provider id 真正到达过这一层。会话请求头里折叠出的
+provider 如果从未在这里出现过，说明该会话走的是回退传输；此时该会话第一次
+`apply_patch` 的结果会追加一条指向推荐配置的简短提示，同一会话后续结果不再
+重复；provider 未知按“未确认”处理，不视为推荐配置。把
+`notifyFallbackTransport` 设为 `false` 只关闭这条提示，不改变任何传输行为。
+插件不会选择或切换路由。
+
 ## 包入口与结果展示
 
 不依赖 DSH 的核心引擎从 `@anionex/dsh-smarter-edit/engine` 导出。DSH 适配代码

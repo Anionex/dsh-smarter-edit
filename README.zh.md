@@ -146,6 +146,39 @@ dsh plugin --profile desktop add @anionex/dsh-smarter-edit
 dsh --profile desktop --dump-config | grep tool-apply-patch
 ```
 
+## 推荐配置
+
+安装插件本身不会改变请求的走向。freeform `apply_patch` 需要一条能承载
+OpenAI **custom 工具 + Lark 语法**的路由，DSH 里由 `dsh-llm-pi-ai` 以
+`openai-responses` 协议提供；而在默认的 DeepSeek 路由
+（`dsh-llm-deepseek`，Chat Completions）上，同一个工具会退化成普通的 JSON
+函数工具。
+
+插件无法替会话切换路由——会话走哪个 provider 属于你的配置，不属于插件。
+你只需要在 **设置 → 模型 → 自定义提供方** 里添加一次，然后在模型选择器里
+选用它：
+
+| 字段 | 值 |
+| --- | --- |
+| Provider ID | `deepseek-responses`（新的 id，**不要复用 `deepseek-official`**） |
+| 显示名称 | DeepSeek (Responses) |
+| API 地址 | `https://api.deepseek.com` |
+| API 协议 | `openai-responses` |
+| API 密钥 | 你的 DeepSeek key |
+| 模型目录 | 你要用的模型，例如 `deepseek-v4.1-flash-expires-on-0910`（上下文 1000000、最大输出 256000） |
+
+默认的 `deepseek-official` 路由保持原样，因此依赖它的能力（图像输入、FIM）
+不受影响。
+
+**怎么验证。** 决定性证据是发出去的请求体：`apply_patch` 必须是
+`type: "custom"` 且 `format.syntax: "lark"`。作为现象级判断，回退路径生效时，
+一个会话里第一次 `apply_patch` 的结果会带一条一次性提示；把
+`notifyFallbackTransport` 设为 `false` 可以关掉它。
+
+**实测效果。** [`docs/deepswe-v1.1-apply-patch-vs-native-editor.zh.md`](docs/deepswe-v1.1-apply-patch-vs-native-editor.zh.md)
+在 DeepSWE v1.1 上对比了这两套配置（英文版：
+[`.md`](docs/deepswe-v1.1-apply-patch-vs-native-editor.md)）。
+
 ## 工作原理
 
 1. 模型发送一个位于 `*** Begin Patch` 与 `*** End Patch` 之间的补丁。
@@ -206,11 +239,15 @@ Profile 中的默认配置：
 - id: tool-apply-patch
   config:
     replaceNativeEdit: true
+    notifyFallbackTransport: true
 ```
 
 只有在明确希望把 `edit`、`write` 和 `str_replace_editor` 与 `apply_patch`
 同时提供给模型时，才设置 `replaceNativeEdit: false`。这个选项不影响自由格式
 传输和事务行为。
+
+`notifyFallbackTransport` 控制[推荐配置](#推荐配置)里那条一次性提示。它不会
+改变传输方式，只决定要不要告诉会话当前处于哪种传输。
 
 ## 基准测试
 
