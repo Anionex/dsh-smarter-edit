@@ -2,14 +2,24 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import z from '@deepseek-ai/schemastery'
-import { defineTool, ToolArgsError, type ToolDefinition } from '@deepseek-ai/dsh-tools'
+import {
+  defineTool,
+  ToolArgsError,
+  type ToolDefinition,
+  type ToolRunContext,
+} from '@deepseek-ai/dsh-tools'
 import {
   installPiAiFreeformBridge,
+  providerUsesFreeformTransport,
   REJECTED_APPLY_PATCH_ARGUMENTS,
   unwrapApplyPatchStream,
 } from './freeform-bridge.js'
 import { runApplyPatch } from './host.js'
 import { parsePatch } from './parser.js'
+import {
+  FALLBACK_TRANSPORT_NOTICE,
+  shouldShowFallbackNotice,
+} from './transport-notice.js'
 
 export const name = '@anionex/dsh-smarter-edit'
 export const inject = ['tools', 'fs', 'llm', 'systemPrompt']
@@ -17,13 +27,61 @@ export const inject = ['tools', 'fs', 'llm', 'systemPrompt']
 export interface Config {
   /** Remove native file-mutation schemas and guidance while this plugin is active. */
   replaceNativeEdit?: boolean
+  /** Tell a session once when its model route cannot carry the freeform transport. */
+  notifyFallbackTransport?: boolean
 }
 
 export const Config: z<Config> = z.object({
   replaceNativeEdit: z.boolean().default(true),
+  notifyFallbackTransport: z.boolean().default(true),
 })
 
 type ResolvedConfig = Required<Config>
+
+/** Sessions already told that their route runs the fallback transport. */
+const notifiedFallbackSessions = new WeakSet<object>()
+
+/** The part of the Session surface this decision reads. */
+interface SessionHeaderSource {
+  requestHeader?: () => { config?: { provider?: unknown } } | undefined
+}
+
+/**
+ * Provider id the Session's next request will use, or undefined when the
+ * Session cannot report one.
+ *
+ * The request-header fold is the live `LlmCallConfig`; the on-disk Session
+ * header is metadata and carries no configuration. Reading it must never turn a
+ * patch that already applied into a failed tool call, so an incompatible or
+ * unreadable Session degrades to "unconfirmed" instead of throwing.
+ */
+function sessionProvider(session: SessionHeaderSource | undefined): string | undefined {
+  try {
+    const provider = session?.requestHeader?.()?.config?.provider
+    return typeof provider === 'string' && provider.length > 0 ? provider : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Append the one-time fallback-transport notice when this session needs it. */
+function withTransportNotice<T extends { summary: string }>(
+  result: T,
+  exec: ToolRunContext,
+  enabled: boolean,
+): T {
+  const session = exec.agent?.session
+  const provider = sessionProvider(session)
+  const notify = shouldShowFallbackNotice({
+    provider,
+    freeformCapable: providerUsesFreeformTransport(provider),
+    enabled,
+    alreadyNotified: session !== undefined && notifiedFallbackSessions.has(session),
+  })
+  if (!notify) return result
+  if (session !== undefined) notifiedFallbackSessions.add(session)
+  return { ...result, summary: `${result.summary}\n\n${FALLBACK_TRANSPORT_NOTICE}` }
+}
 
 const TOOL_DESCRIPTION = 'Create, update, move, and delete files by applying a patch.'
 
@@ -154,7 +212,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const definition: ToolDefinition = {
     ...typedDefinition,
     async execute(args, exec) {
-      return runApplyPatch(ctx, applyPatchText(args), exec)
+      const result = await runApplyPatch(ctx, applyPatchText(args), exec)
+      return withTransportNotice(result, exec, resolved.notifyFallbackTransport)
     },
     presentCall(args) {
       try {
@@ -178,4 +237,5 @@ export * from './host.js'
 export * from './matcher.js'
 export * from './parser.js'
 export * from './source-file.js'
+export * from './transport-notice.js'
 export * from './types.js'

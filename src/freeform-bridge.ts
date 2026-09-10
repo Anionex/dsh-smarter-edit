@@ -50,6 +50,32 @@ interface GlobalBridgeState {
 const STATE_KEY = Symbol.for('@anionex/dsh-smarter-edit/pi-ai-freeform-bridge')
 const globalBridge = globalThis as typeof globalThis & { [STATE_KEY]?: GlobalBridgeState }
 
+/**
+ * Provider routes observed on the pi-ai adapter during this process.
+ *
+ * The adapter is the only boundary that can emit the apply_patch grammar tool,
+ * so a provider id recorded here is one whose requests really carry freeform
+ * patch text. Session headers name their provider, which makes this set the
+ * honest answer to "is this session on the recommended configuration".
+ */
+const freeformRoutedProviders = new Set<string>()
+
+function noteFreeformRoute(options: unknown): void {
+  if (typeof options !== 'object' || options === null) return
+  const provider = (options as { provider?: unknown }).provider
+  if (typeof provider === 'string' && provider.length > 0) freeformRoutedProviders.add(provider)
+}
+
+/** Whether requests for `provider` have been seen flowing through the pi-ai adapter. */
+export function providerUsesFreeformTransport(provider: string | undefined): boolean {
+  return provider !== undefined && freeformRoutedProviders.has(provider)
+}
+
+/** Test-only: forget the observed provider routes. */
+export function resetFreeformTransportObservation(): void {
+  freeformRoutedProviders.clear()
+}
+
 function isPatchStringSchema(parameters: unknown): boolean {
   if (typeof parameters !== 'object' || parameters === null || Array.isArray(parameters)) return false
   const schema = parameters as { type?: unknown; required?: unknown; properties?: unknown }
@@ -647,6 +673,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
     )
   }
   const streamWrapper = function(this: unknown, options: unknown): AsyncIterable<unknown> {
+    noteFreeformRoute(options)
     return originalStream.call(this, rewrapApplyPatchHistory(options))
   }
   Object.defineProperty(prototype, 'stream', {
@@ -659,6 +686,7 @@ export async function installPiAiFreeformBridge(): Promise<() => void> {
   if (Object.hasOwn(prototype, 'prepareCall') && typeof prototype.prepareCall === 'function') {
     originalPrepareCall = prototype.prepareCall
     prepareCallWrapper = async function(this: unknown, ...args: unknown[]): Promise<unknown> {
+      noteFreeformRoute({ provider: args[0] })
       const prepared = await (originalPrepareCall as PrepareCall).apply(this, args)
       if (
         typeof prepared !== 'object'

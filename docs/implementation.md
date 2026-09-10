@@ -93,6 +93,14 @@ pi-ai's envelope only inside the adapter when a later model step replays raw
 Session history. Live arguments, Session logs, and the Trajectory parameter view
 therefore contain raw patch text.
 
+The bridge also records which provider ids actually reached it. A Session whose
+request-header fold names a provider never observed there is on the fallback
+transport, so the first `apply_patch` result of that Session appends one short
+note linking to the recommended configuration; later results in the same
+Session stay unchanged, and an unknown provider counts as unconfirmed rather
+than recommended. `notifyFallbackTransport: false` disables the note without
+changing any transport behavior. The plugin never selects or switches a route.
+
 ## Package entry points and presentation
 
 The pure engine is available from `@anionex/dsh-smarter-edit/engine`. The DSH
