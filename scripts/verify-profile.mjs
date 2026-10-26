@@ -13,8 +13,9 @@ import { parseArgs } from 'node:util'
 
 const { values } = parseArgs({ options: {
   dsh: { type: 'string' }, output: { type: 'string' }, 'keep-web': { type: 'boolean', default: false },
+  published: { type: 'boolean', default: false },
 } })
-assert(values.dsh, 'usage: node scripts/verify-profile.mjs --dsh <target-cli> [--output report.json] [--keep-web]')
+assert(values.dsh, 'usage: node scripts/verify-profile.mjs --dsh <target-cli> [--output report.json] [--keep-web] [--published]')
 const cli = resolve(values.dsh)
 const repo = dirname(dirname(fileURLToPath(import.meta.url)))
 const root = await realpath(await mkdtemp(join(tmpdir(), 'smarter-edit-profile-')))
@@ -110,7 +111,15 @@ try {
     { id: 'agent-default-model', config: { provider: 'fixture', model: 'fixture' } },
   ]))
   const pack = join(root, 'pack'); await mkdir(pack)
-  await run('pnpm', ['pack', '--pack-destination', pack], repo)
+  const pkg = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8'))
+  report.package = `${pkg.name}@${pkg.version}`
+  report.source = values.published ? 'https://registry.npmjs.org' : 'local checkout'
+  if (values.published) {
+    await run('npm', ['pack', report.package, '--ignore-scripts', '--pack-destination', pack,
+      '--registry=https://registry.npmjs.org'], repo)
+  } else {
+    await run('pnpm', ['pack', '--pack-destination', pack], repo)
+  }
   const tarballs = (await readdir(pack)).filter(file => file.endsWith('.tgz'))
   assert.equal(tarballs.length, 1)
   const tarball = join(pack, tarballs[0])
@@ -122,7 +131,9 @@ try {
     await run(cli, ['plugin', '--profile', profile, 'add', tarball, '--registry=https://registry.npmjs.org'])
     const installed = await realpath(join(dir, 'node_modules/@anionex/dsh-smarter-edit'))
     assert(installed.startsWith(root), 'tarball must not resolve to the repository')
+    assert.equal(JSON.parse(await readFile(join(installed, 'package.json'), 'utf8')).version, pkg.version)
     assert.deepEqual(await readFile(join(installed, 'lib/index.js')), await readFile(join(repo, 'lib/index.js')))
+    assert.deepEqual(await readFile(join(installed, 'lib/client.js')), await readFile(join(repo, 'lib/client.js')))
     assert((await run(cli, ['--profile', profile, '--dump-config'])).includes('@anionex/dsh-smarter-edit'))
     report.steps.push(`${profile}: tarball installed and bundle mounted`)
   }

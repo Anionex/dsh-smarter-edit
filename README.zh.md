@@ -250,6 +250,7 @@ node scripts/verify-profile.mjs --dsh /path/to/dsh --output profile-report.json
 验收脚本隔离两个 DSH home，通过本地模拟模型服务核对自由格式工具请求、文件变更
 和结果回传，结束后清理临时环境，不调用付费模型。添加 `--keep-web` 可将临时 Web
 宿主保留最多十分钟，供浏览器验收。
+发布后添加 `--published`，可从 npm 官方仓库下载并验收当前版本的正式包。
 
 测试覆盖 Codex 官方场景、解析与匹配、沙箱路径、预演隔离、故障回滚、清理、
 并发修改检测、工具注册、原生工具过滤、包结构、DSH 原始调用还原、原生差异展示

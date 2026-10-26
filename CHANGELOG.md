@@ -6,6 +6,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-10-26
+
 ### Fixed
 
 - Support DSH `0.2.1-rc.2` and `0.2.1-rc.3`, retaining the existing `0.1.x`
@@ -138,7 +140,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.10
 [0.1.9]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.9
 [0.1.8]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.8
 [0.1.7]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.7

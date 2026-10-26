@@ -271,6 +271,8 @@ The verifier isolates both DSH homes, uses a local fixture provider, checks
 custom-tool requests, file changes, and result replay, then cleans up. It does
 not call a paid model. Add `--keep-web` to retain the temporary Web host for up
 to ten minutes for browser inspection.
+After publishing, add `--published` to verify the current package version
+downloaded from the official npm registry instead of packing the checkout.
 
 The test suite covers the official Codex corpus, parser and matcher behavior,
 sandbox paths, preflight isolation, rollback faults, cleanup, concurrent
