@@ -44,10 +44,11 @@
 
 ## 自由格式传输
 
-DSH `0.1.x` 对外提供用 JSON Schema 描述的工具定义，并在请求进入模型服务适配器
-前移除 custom-tool 元数据。本插件在 `PiAiAdapter.current()` 这个模型快照冻结
+DSH `0.1.x` 和 `0.2.1` 对外提供用 JSON Schema 描述的工具定义，并在请求进入模型服务
+适配器前移除 custom-tool 元数据。本插件在 `PiAiAdapter.current()` 这个模型快照冻结
 位置加入一层范围受限、支持引用计数的适配，只为完全匹配的 `apply_patch`
-schema 添加随包提供的 OpenAI Lark grammar。
+schema 添加随包提供的 OpenAI Lark grammar。适配同时覆盖请求级 `tools` 和 pi-ai 1.x
+system 消息中的 `toolsAdded`，保留工具移除记录及无关历史。
 
 通过 pi-ai 调用 OpenAI Responses 时，发送给模型服务的请求包含
 `type: "custom"` 工具和原始补丁文本。支持 grammar custom tool 的 OpenAI Chat

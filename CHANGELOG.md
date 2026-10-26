@@ -6,6 +6,22 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Support DSH `0.2.1-rc.2` and `0.2.1-rc.3`, retaining the existing `0.1.x`
+  peer range and legacy client icon fallback.
+- Handle preparing tool calls and the current diff toolbar labels without
+  accessing unavailable arguments or removed icons and locale keys.
+- Preserve freeform grammar metadata for pi-ai 1.x in-history tool additions,
+  as well as request-level declarations.
+
+### Development
+
+- Align development dependencies and wire serialization tests with DSH 0.2.1
+  and pi-ai 1.x, replacing the retired code runtime dependency.
+- Add an isolated tarball verifier covering real headless execution, result
+  replay, file contents, and Web startup with a local fixture provider.
+
 ## [0.1.9] - 2026-09-08
 
 ### Fixed

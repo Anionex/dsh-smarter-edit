@@ -1,11 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   DiffBlock,
   DisclosureRow,
-  IconEditOutline16,
-  IconInspectOutline12,
   StateDot,
   type DiffBlockLabels,
   type DiffHunk,
@@ -16,6 +15,14 @@ import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 
 type ApplyPatchRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 type RowState = 'running' | 'ok' | 'error' | 'stopped'
+
+// DSH 0.2 renamed the icons; keep the same bundle usable on 0.1 hosts.
+const legacyIcons = primitives as typeof primitives & {
+  IconEditOutline16?: typeof primitives.IconEditOutlineRegular
+  IconInspectOutline12?: typeof primitives.IconInspectOutlineRegular
+}
+const EditIcon = primitives.IconEditOutlineRegular ?? legacyIcons.IconEditOutline16
+const InspectIcon = primitives.IconInspectOutlineRegular ?? legacyIcons.IconInspectOutline12
 
 const CSS = `
 .dsh-smarter-edit-row{display:flex;flex-direction:column;width:100%;min-width:0}
@@ -110,10 +117,10 @@ function stateLeading(state: RowState): ReactNode {
   if (state === 'error') return <StateDot state="error" />
   if (state === 'stopped') return <StateDot state="warning" />
   if (state === 'running') return <StateDot state="ongoing" />
-  return <IconEditOutline16 size={14} />
+  return <EditIcon size={14} />
 }
 
-function diffLabels(t: ApplyPatchRowProps['t']): DiffBlockLabels {
+function diffLabels(t: ApplyPatchRowProps['t']): DiffBlockLabels & { files: (count: number) => string } {
   return {
     copy: t('copy'),
     copied: t('copied'),
@@ -121,7 +128,13 @@ function diffLabels(t: ApplyPatchRowProps['t']): DiffBlockLabels {
     expandAria: count => t('diff.expandAria', { count }),
     collapse: t('collapse'),
     expand: count => t('diff.expandRest', { count }),
-    files: count => t(count === 1 ? 'diff.files.one' : 'diff.files.other', { count }),
+    codeLabel: t('codeBlock.title'),
+    wrapLabel: t('codeBlock.wrap'),
+    unwrapLabel: t('codeBlock.unwrap'),
+    // Only older DiffBlock versions consume this label.
+    files: count => (t as (key: string, params: { count: number }) => string)(
+      count === 1 ? 'diff.files.one' : 'diff.files.other', { count },
+    ),
   }
 }
 
@@ -135,7 +148,7 @@ export function ApplyPatchRow({
   const [expanded, setExpanded] = useState(false)
   const done = 'kind' in block
   const call = done ? block.call : block
-  const raw = call?.argsRaw ?? ''
+  const raw = call !== null && 'argsRaw' in call ? call.argsRaw : ''
   const state = rowState(block)
   const diffs = done && !block.isError ? narrowDiffs(block.meta) : null
   const output = resultText(block)
@@ -145,7 +158,7 @@ export function ApplyPatchRow({
   const summary = paths.length === 1
     ? paths[0] as string
     : paths.length > 1
-      ? t('diff.files.other', { count: paths.length })
+      ? paths.join(', ')
       : callId
   const expandable = diffs !== null || output !== null
   const open = expanded && expandable
@@ -198,7 +211,7 @@ export function ApplyPatchRow({
             )}
           {inspect !== undefined && (
             <button type="button" className="dsh-smarter-edit-row__inspect" onClick={inspect}>
-              <IconInspectOutline12 />
+              <InspectIcon />
               {t('row.inspect')}
             </button>
           )}
