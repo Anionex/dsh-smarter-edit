@@ -7,6 +7,11 @@ interface PiToolLike {
 }
 interface PiContextLike {
     tools?: PiToolLike[];
+    messages?: {
+        role?: string;
+        toolsAdded?: PiToolLike[];
+        [key: string]: unknown;
+    }[];
     [key: string]: unknown;
 }
 interface ModelsLike {

@@ -51,11 +51,12 @@ fixed patch-size limit, so this cost grows with the size of the patch.
 
 ## Freeform transport
 
-DSH `0.1.x` exposes JSON-schema tool definitions and strips custom-tool metadata
-before the provider adapter. This plugin installs a narrow, reference-counted
+DSH `0.1.x` and `0.2.1` expose JSON-schema tool definitions and strip custom-tool
+metadata before the provider adapter. This plugin installs a narrow, reference-counted
 bridge at `PiAiAdapter.current()`, the request-frozen model snapshot boundary,
 and enriches only the exact `apply_patch` schema with the bundled OpenAI Lark
-grammar.
+grammar. It handles both request-level `tools` and pi-ai 1.x `toolsAdded`
+declarations in system messages, preserving tool removals and unrelated history.
 
 On pi-ai OpenAI Responses routes, the provider request contains an OpenAI
 `type: "custom"` tool with raw input. Grammar-capable OpenAI Chat Completions

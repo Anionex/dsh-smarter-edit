@@ -6,6 +6,24 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-10-26
+
+### Fixed
+
+- Support DSH `0.2.1-rc.2` and `0.2.1-rc.3`, retaining the existing `0.1.x`
+  peer range and legacy client icon fallback.
+- Handle preparing tool calls and the current diff toolbar labels without
+  accessing unavailable arguments or removed icons and locale keys.
+- Preserve freeform grammar metadata for pi-ai 1.x in-history tool additions,
+  as well as request-level declarations.
+
+### Development
+
+- Align development dependencies and wire serialization tests with DSH 0.2.1
+  and pi-ai 1.x, replacing the retired code runtime dependency.
+- Add an isolated tarball verifier covering real headless execution, result
+  replay, file contents, and Web startup with a local fixture provider.
+
 ## [0.1.9] - 2026-09-08
 
 ### Fixed
@@ -122,7 +140,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   patch parsing, ordered matching, full preflight, transactional application,
   rollback on handled failures, and unified diff output.
 
-[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/Anionex/dsh-smarter-edit/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.10
 [0.1.9]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.9
 [0.1.8]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.8
 [0.1.7]: https://github.com/Anionex/dsh-smarter-edit/releases/tag/v0.1.7

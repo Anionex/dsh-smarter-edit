@@ -13,6 +13,7 @@ interface PiToolLike {
 
 interface PiContextLike {
   tools?: PiToolLike[]
+  messages?: { role?: string; toolsAdded?: PiToolLike[]; [key: string]: unknown }[]
   [key: string]: unknown
 }
 
@@ -528,10 +529,8 @@ export async function* unwrapApplyPatchStream<T>(source: AsyncIterable<T>): Asyn
 
 /** Add pi-ai grammar metadata only to this plugin's single-string tool schema. */
 export function withApplyPatchGrammar(context: PiContextLike, grammar: string): PiContextLike {
-  const tools = context.tools
-  if (!Array.isArray(tools)) return context
   let changed = false
-  const bridgedTools = tools.map((tool) => {
+  const bridgeTools = (tools: PiToolLike[]): PiToolLike[] => tools.map((tool) => {
     if (tool.name !== APPLY_PATCH_TOOL_NAME || !isPatchStringSchema(tool.parameters)) return tool
     changed = true
     return {
@@ -542,7 +541,16 @@ export function withApplyPatchGrammar(context: PiContextLike, grammar: string): 
       },
     }
   })
-  return changed ? { ...context, tools: bridgedTools } : context
+  const tools = Array.isArray(context.tools) ? bridgeTools(context.tools) : context.tools
+  // pi-ai 1.x also carries deferred tool declarations in system history.
+  const messages = context.messages?.map(message => message.role === 'system' && Array.isArray(message.toolsAdded)
+    ? { ...message, toolsAdded: bridgeTools(message.toolsAdded) }
+    : message)
+  return changed ? {
+    ...context,
+    ...(tools === undefined ? {} : { tools }),
+    ...(messages === undefined ? {} : { messages }),
+  } : context
 }
 
 function grammarCapableModel(model: unknown): unknown {

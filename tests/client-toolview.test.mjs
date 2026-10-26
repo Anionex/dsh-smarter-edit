@@ -29,15 +29,14 @@ function findClass(root, className) {
   return null
 }
 
-test('uses only the Desktop alpha.1 primitive surface and registers its keyed toolview', async () => {
+for (const iconVersion of ['legacy', 'current']) {
+test(`renders with ${iconVersion} DSH icons and registers its keyed toolview`, async () => {
   const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
   const primitiveMembers = [...source.matchAll(/dsh_client_ui_primitives_1\.([A-Za-z0-9_]+)/gu)]
     .map(match => match[1])
   assert.deepEqual([...new Set(primitiveMembers)].sort(), [
     'DiffBlock',
     'DisclosureRow',
-    'IconEditOutline16',
-    'IconInspectOutline12',
     'StateDot',
   ])
   let bundle
@@ -53,6 +52,8 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
 
   const DiffBlock = Symbol('DiffBlock')
   const DisclosureRow = Symbol('DisclosureRow')
+  const EditIcon = Symbol('EditIcon')
+  const InspectIcon = Symbol('InspectIcon')
   const modules = {
     'react/jsx-runtime': {
       Fragment: Symbol('Fragment'),
@@ -66,8 +67,9 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
     '@deepseek-ai/dsh-client-ui-primitives': {
       DiffBlock,
       DisclosureRow,
-      IconEditOutline16: Symbol('IconEditOutline16'),
-      IconInspectOutline12: Symbol('IconInspectOutline12'),
+      ...(iconVersion === 'current'
+        ? { IconEditOutlineRegular: EditIcon, IconInspectOutlineRegular: InspectIcon }
+        : { IconEditOutline16: EditIcon, IconInspectOutline12: InspectIcon }),
       StateDot: Symbol('StateDot'),
     },
   }
@@ -101,6 +103,7 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
     toolName: 'apply_patch',
     openFile() {},
     loadImage() {},
+    inspect() {},
     t(key, params) { return `${key}:${params?.count ?? ''}` },
   }
   const successBlock = {
@@ -132,6 +135,11 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
   assert.notEqual(diff, null)
   assert.equal(JSON.stringify(diff.props.diffs), JSON.stringify(diffs))
   assert.equal(diff.props.maxLines, 8)
+  assert.equal(diff.props.labels.codeLabel, 'codeBlock.title:')
+  assert.equal(diff.props.labels.wrapLabel, 'codeBlock.wrap:')
+  assert.equal(diff.props.labels.unwrapLabel, 'codeBlock.unwrap:')
+  assert.equal(findElement(tree, DisclosureRow).props.icon.type, EditIcon)
+  assert.notEqual(findElement(tree, InspectIcon), null)
   const disclosure = findElement(tree, DisclosureRow)
   assert.equal(disclosure.props.title, 'Apply patch')
   const collapsedChildren = disclosure.props.collapsedContent.props.children
@@ -147,6 +155,20 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
   })
   assert.equal(running.props['data-state'], 'running')
   assert.equal(findElement(running, DisclosureRow).props.icon.props.state, 'ongoing')
+
+  const preparing = registration.component({
+    ...baseProps,
+    phase: 'preparing',
+    block: { phase: 'preparing', name: 'apply_patch', callId: 'call-1', args: {} },
+  })
+  assert.equal(preparing.props['data-state'], 'running')
+  assert.equal(findElement(preparing, DisclosureRow).props.expandable, false)
+
+  const multiple = registration.component({
+    ...baseProps,
+    block: { ...successBlock, meta: { diffs: [...diffs, { path: 'other.txt', oldText: null, newText: 'new' }] } },
+  })
+  assert.equal(findClass(findElement(multiple, DisclosureRow).props.collapsedContent, 'dsh-smarter-edit-row__summary').props.children, 'src/app.ts, other.txt')
 
   const failure = registration.component({
     ...baseProps,
@@ -182,3 +204,4 @@ test('uses only the Desktop alpha.1 primitive surface and registers its keyed to
     assert.equal(findClass(historical, 'dsh-smarter-edit-row__output').props['data-error'], false)
   }
 })
+}

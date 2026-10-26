@@ -171,7 +171,7 @@ active. Unloading it restores the original tools.
 
 ## Compatibility and limitations
 
-- DSH `>=0.1.1-rc.1 <0.2.0`.
+- DSH `>=0.1.1-rc.1 <0.2.0 || >=0.2.1-rc.2 <0.3.0`.
 - Node.js `^22.19.0 || >=24.0.0` for package development and direct engine use.
 - `desktop`, `web`, and `headless` Profiles.
 - Write permission from the active DSH sandbox. `workspace-write` keeps its
@@ -183,7 +183,7 @@ active. Unloading it restores the original tools.
 - A broad patch can change or delete several files. Review the requested patch
   and the resulting diff when a change has a large scope.
 
-The project is pre-1.0. Compatibility targets the declared DSH `0.1.x` range;
+The project is pre-1.0. Compatibility targets the declared DSH `0.1.x` and `0.2.x` ranges;
 release verification installs the tarball into a clean Profile.
 
 ## Implementation details
@@ -259,6 +259,20 @@ pnpm install --frozen-lockfile
 pnpm peers check
 pnpm run check
 ```
+
+Development dependencies target DSH `0.2.1-rc.2`. Verify another installed host
+with a packed bundle, a fresh headless Agent, and a real Web startup:
+
+```sh
+node scripts/verify-profile.mjs --dsh /path/to/dsh --output profile-report.json
+```
+
+The verifier isolates both DSH homes, uses a local fixture provider, checks
+custom-tool requests, file changes, and result replay, then cleans up. It does
+not call a paid model. Add `--keep-web` to retain the temporary Web host for up
+to ten minutes for browser inspection.
+After publishing, add `--published` to verify the current package version
+downloaded from the official npm registry instead of packing the checkout.
 
 The test suite covers the official Codex corpus, parser and matcher behavior,
 sandbox paths, preflight isolation, rollback faults, cleanup, concurrent

@@ -3,6 +3,7 @@ import test from 'node:test'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { stream as streamOpenAICompletions } from '@earendil-works/pi-ai/api/openai-completions'
 import { stream as streamOpenAIResponses } from '@earendil-works/pi-ai/api/openai-responses'
+import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import {
   bridgeSnapshot,
   installPiAiFreeformBridge,
@@ -65,6 +66,24 @@ test('snapshot bridge forces raw grammar transport without a model capability ga
     {},
   ), 'stream')
   assert.equal(capturedModel.compat.supportsOpenAIGrammarTools, true)
+})
+
+test('bridges in-history tool additions without changing removals or unrelated messages', () => {
+  const other = { name: 'read', parameters: { type: 'object', properties: {} } }
+  const user = { role: 'user', content: 'edit', toolsAdded: [patchTool] }
+  const removed = { role: 'system', content: '', toolsRemoved: [{ name: 'apply_patch' }] }
+  const context = { messages: [user, { role: 'system', content: '', toolsAdded: [other, patchTool] }, removed] }
+  let captured
+  const snapshot = bridgeSnapshot({ models: { streamSimple(model, value) { captured = { model, value }; return 'stream' } } }, 'start: "x"')
+  assert.equal(snapshot.models.streamSimple({ compat: {} }, context, {}), 'stream')
+  assert.equal(captured.model.compat.supportsOpenAIGrammarTools, true)
+  assert.equal(captured.value.messages[0], user)
+  assert.equal(captured.value.messages[2], removed)
+  assert.equal(captured.value.messages[1].toolsAdded[0], other)
+  assert.equal(captured.value.messages[1].toolsAdded[1].constrainedSampling.type, 'grammar')
+  assert.equal(context.messages[1].toolsAdded[1].constrainedSampling, undefined)
+  const untouched = { messages: [user, removed], tools: [other] }
+  assert.equal(withApplyPatchGrammar(untouched, 'start: "x"'), untouched)
 })
 
 test('snapshot bridge preserves apply_patch identity for a zero-delta pi-ai call', async () => {
@@ -225,7 +244,7 @@ test('pi-ai serializes the enriched schema as an OpenAI custom tool on the wire'
     maxTokens: 1_000,
     compat: { supportsOpenAIGrammarTools: true },
   }
-  const events = streamOpenAIResponses(model, context, {
+  const events = streamOpenAIResponses(model, normalizeContext(context), {
     apiKey: 'test-key',
     onPayload(value) {
       payload = value
@@ -261,7 +280,7 @@ test('pi-ai serializes the enriched schema as a Chat Completions custom tool', a
     maxTokens: 1_000,
     compat: { supportsOpenAIGrammarTools: true },
   }
-  const events = streamOpenAICompletions(model, context, {
+  const events = streamOpenAICompletions(model, normalizeContext(context), {
     apiKey: 'test-key',
     onPayload(value) {
       payload = value

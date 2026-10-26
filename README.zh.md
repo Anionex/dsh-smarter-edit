@@ -158,7 +158,7 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
 
 ## 兼容性与限制
 
-- DSH `>=0.1.1-rc.1 <0.2.0`。
+- DSH `>=0.1.1-rc.1 <0.2.0 || >=0.2.1-rc.2 <0.3.0`。
 - 包开发和直接调用引擎需要 Node.js `^22.19.0 || >=24.0.0`。
 - 支持 `desktop`、`web` 和 `headless` Profile。
 - 需要当前 DSH 沙箱授权写入。`workspace-write` 保留已配置的边界；
@@ -168,7 +168,7 @@ dsh --profile desktop --dump-config | grep tool-apply-patch
 - 一个范围较大的补丁可以修改或删除多个文件；范围较大时应审查原始补丁和结果
   差异。
 
-项目仍处于 1.0 之前。兼容目标是声明的 DSH `0.1.x` 范围；发布验收会把安装包
+项目仍处于 1.0 之前。兼容目标是声明的 DSH `0.1.x` 和 `0.2.x` 范围；发布验收会把安装包
 装入干净的 Profile。
 
 ## 实现说明
@@ -239,6 +239,18 @@ pnpm install --frozen-lockfile
 pnpm peers check
 pnpm run check
 ```
+
+开发依赖以 DSH `0.2.1-rc.2` 为基线。使用以下命令验证指定宿主的安装包加载、
+新建 Headless Agent 和真实 Web 启动：
+
+```sh
+node scripts/verify-profile.mjs --dsh /path/to/dsh --output profile-report.json
+```
+
+验收脚本隔离两个 DSH home，通过本地模拟模型服务核对自由格式工具请求、文件变更
+和结果回传，结束后清理临时环境，不调用付费模型。添加 `--keep-web` 可将临时 Web
+宿主保留最多十分钟，供浏览器验收。
+发布后添加 `--published`，可从 npm 官方仓库下载并验收当前版本的正式包。
 
 测试覆盖 Codex 官方场景、解析与匹配、沙箱路径、预演隔离、故障回滚、清理、
 并发修改检测、工具注册、原生工具过滤、包结构、DSH 原始调用还原、原生差异展示
